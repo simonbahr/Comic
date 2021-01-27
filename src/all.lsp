@@ -596,7 +596,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-save-preferences ()
-  (output-src-file "user-preferences.lsp"
+  (output-src-file "user.preferences"
 		   (format nil
 			   ";;; This is a preference-file for Comic. 
 ;;; You can load it into lisp using (cc-load-preferences)~%~%~a"
@@ -605,7 +605,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-load-preferences ()
   ;; load preference file into +cc-data+
-  (let* ((pref-file (src-dir "user-preferences.lsp"))
+  (let* ((pref-file (src-dir "user.preferences"))
 	 (exists? (when (probe-file pref-file) t)))
     (if exists?
 	(cc-set :preferences
