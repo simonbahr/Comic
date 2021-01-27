@@ -1,6 +1,6 @@
-# comic
+# Comic
 
-##A Lisp-Environment for Inter-Media Composition
+## A Lisp-Environment for Inter-Media Composition
 
 Comic is still very experimental.
 
