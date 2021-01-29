@@ -130,9 +130,20 @@
 ;;; ****
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defgeneric render-events (events render-mode protagonist
-			   &optional print))
+(defgeneric render-events (events render-mode
+			   &optional protagonist print))
 
+;; prevent error if render-events is calld with no
+;; render-modes. Simply print a warning!
+(defmethod render-events (events (render-mode (eql nil))
+			  &optional protagonist print)
+  (declare (ignore protagonist render-mode print))
+  (format
+   t
+   "~&!!! ERROR: trying to render ~a events with no render-mode."
+   (length events)))
+  
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****f* render-mode/make-render-mode
 ;;; Name
@@ -224,7 +235,7 @@
 ;;; Example
 #|
 (make-render-mode dummy :sound :required-slots (pitch)
-                        :event-code (print pitch))
+:event-code (print pitch))
 |#
 ;;;
 ;;; Last Modified
@@ -248,97 +259,118 @@
 ;;; ****
   ;; CHECK FOR PROP-NAMES
   (loop for prop in (flat required-slots)
-     do
-       (unless
-	   (member
-	    prop
-	    (loop for slot in (cc-get :event-slots)
-	       collect (car slot)))
-	 (cc-error 'MAKE-RENDER-MODE
-	     "The unit name ~a is no unknown.~%~
+	do
+	   (unless
+	       (member
+		prop
+		(loop for slot in (cc-get :event-slots)
+		      collect (car slot)))
+	     (cc-error 'MAKE-RENDER-MODE
+		 "The unit name ~a is no unknown.~%~
               You can add custom properties using (add-event-slot)"
-	   prop)))
+	       prop)))
   ;; CHECK FOR OUTPUT-TYPE
-  (unless (assoc output-type (cc-get :output-types))
-    (cc-error 'MAKE-RENDER-MODE
-	"The output-type ~a is no unknown.~%~
-         You can add custom output-types using (add-output-type)"
-      output-type))
-  ;;group-events can be a form to be evaluated (why? why not?!)
+  (unless (member output-type (cc-get :output-types))
+    (add-output-type output-type))
+  ;; (cc-error 'MAKE-RENDER-MODE
+  ;; 	"The output-type ~a is no unknown.~%~
+  ;;      You can add custom output-types using (add-output-type)"
+  ;;   output-type)
+  ;; CHECK FOR EVENT SLOTS
+  (let ((event-slots
+	  (loop for s in (cc-get :event-slots) collect (car s))))
+    (loop for slot in (append required-slots optional-slots)
+	  do
+	     (unless (member slot event-slots)
+	       (add-event-slot slot))))
+  ;; group-events may be a form to be evaluated (why? why not?!)
   (setq group-events (eval group-events))
   ;; MAKE THE INSTANCE
   (let* ((instance
-	  (make-instance 'render-mode
-			 :name name
-			 :options options
-			 :output-type output-type
-			 :required-slots required-slots
-			 :optional-slots optional-slots
-			 :required-packages required-packages
-			 :required-software required-software
-			 :header-code header-code
-			 :before-code before-code
-			 :event-code event-code
-			 :after-code after-code
-			 :footer-code footer-code
-			 :group-events group-events))
+	   (make-instance 'render-mode
+			  :name name
+			  :options options
+			  :output-type output-type
+			  :required-slots required-slots
+			  :optional-slots optional-slots
+			  :required-packages required-packages
+			  :required-software required-software
+			  :header-code header-code
+			  :before-code before-code
+			  :event-code event-code
+			  :after-code after-code
+			  :footer-code footer-code
+			  :group-events group-events))
 	 (method
-	  `(defmethod render-events (events (render-mode (eql ,instance))
-				     (protagonist protagonist) &optional print)
-	     (let* ,(append
-		     '((comic (cc-get-render-data 'comic))
-		       (title (cc-get-render-data 'title))
-		       (subtitle (cc-get-render-data 'subtitle))
-		       (author (cc-get-render-data 'author))
-		       (date (cc-get-render-data 'date))
-		       (output-dir (cc-get-render-data 'output-dir))
-		       (project-name (name comic))
-		       (ids (mapcar #'id events))
-		       (tmp1) (tmp2) (tmp3) (tmp4) (tmp5)
-		       (return-file-path))
-		     (loop for opt in options
-			 for n from 0 collect
-			  (list (car opt)
-				`(second (nth ,n (slot-value ,instance 'options))))))
-	       (declare (ignorable comic title subtitle author date
-			   project-name output-dir ids tmp1 tmp2 tmp3 tmp4 tmp5))
-	       (when events
-		 ;; run header-code
-		 ,header-code
-		 ;; group events if specified
-		 ,(when group-events
-		    '(setq events (cc-group-events events)))
-		 (loop for event in events
-		    do
-		      (progn;; progn to ensure evaluable form!
-			,(when group-events
-			   ;; ensure flat list
-			   '(setq event (flat events))))
-		    ;; run before-code
-		      (progn ,before-code);; progn to ensure evaluable form!
-		    ;; run event-code, loop in case of grouped events
-		      (loop for event in (flat event) do
-			   (let ,(loop for slot in
-				      (append '(id) required-slots optional-slots)
-				    collect
-				      (list slot (list slot 'event)))
-			     (declare ,(append '(ignorable)
-					       '(id) required-slots optional-slots))
-			     ;; Information to std-out, when print or verbose is t
-			     (if (or print (when-verbose))
-				 (format t "~& ... -> ID: ~a, ~
+	   `(defmethod render-events (events (render-mode (eql ,instance))
+				      &optional protagonist print)
+	      ;; when rendering without protagonist, a dummy will be
+	      ;; created. This way, we can always use the
+	      ;; protagonist-var in render-mode-code!
+	      (unless protagonist
+		(setq protagonist (make-protagonist ,output-type)))
+	      (let* ,(append
+		      '((comic (cc-get-render-data 'comic))
+			(title (cc-get-render-data 'title))
+			(subtitle (cc-get-render-data 'subtitle))
+			(author (cc-get-render-data 'author))
+			(date (cc-get-render-data 'date))
+			(output-dir (cc-get-render-data 'output-dir))
+			(project-name (name comic))
+			(ids (mapcar #'id events))
+			(tmp1) (tmp2) (tmp3) (tmp4) (tmp5)
+			(return-file-path))
+		      (loop for opt in options
+			    for n from 0
+			    collect
+			    (list (car opt)
+				  `(second
+				    (nth ,n (slot-value ,instance 'options))))))
+		(declare (ignorable comic title subtitle author date
+				    project-name output-dir ids tmp1
+				    tmp2 tmp3 tmp4 tmp5))
+		(when events
+		  ;; run header-code
+		  ,header-code
+		  ;; group events if specified
+		  ,(when group-events
+		     '(setq events (cc-group-events events)))
+		  (loop for event in events
+			do
+			   (progn;; progn to ensure evaluable form!
+			     ,(when group-events
+				;; ensure flat list
+				'(setq event (flat events))))
+			   ;; run before-code
+			   (progn ,before-code);; progn to ensure evaluable form!
+			   ;; run event-code, loop in case of grouped events
+			   (loop for event in (flat event) do
+			     (let ,(loop for slot in
+						  (append '(id)
+							  required-slots
+							  optional-slots)
+					 collect
+					 (list slot (list slot 'event)))
+			       (declare ,(append '(ignorable)
+						 '(id) required-slots optional-slots))
+			       ;; Information to std-out, when print or verbose is t
+			       (if (or print (when-verbose))
+				   (format t "~& ... -> ID: ~a, ~
                                   Render-Mode: ~a, Protagonist: ~a~%"
-					 id (name render-mode) (name protagonist))
-				 (format t "."))
-			     ,event-code))
-		    ;; run after-code
-		      (progn ,after-code));; progn to ensure evaluable form!
-		 ;; run footer-code
-		 ,footer-code)
-	       ;; return the return-file-path. It is up to the mode if it is set or
-	       ;; remains nil. It can also be set to t to indicate that something
-	       ;; happend, but not return a path to the protagonist.
-	       return-file-path))))
+					   id (name render-mode)
+					   (if (name protagonist)
+					       (name protagonist)
+					       "None"))
+				   (format t "."))
+			       ,event-code))
+			   ;; run after-code
+			   (progn ,after-code));; progn to ensure evaluable form!
+		  ;; run footer-code
+		  ,footer-code)
+		;; return the return-file-path. It is up to the mode if it is set or
+		;; remains nil. It can also be set to t to indicate that something
+		;; happend, but not return a path to the protagonist.
+		return-file-path))))
     ;; add render-mode-name to +cc-data+
     (cc-set :render-modes
 	    (acons name instance
@@ -386,7 +418,7 @@
 ;;; ****
   (cond ((listp name)
 	 (loop for elem in name collect
-	      (get-render-mode elem)))
+				(get-render-mode elem)))
 	((typep name 'render-mode)
 	 name)
 	((symbolp name)
@@ -435,35 +467,35 @@
       (if mode
 	  (setq render-mode mode)
 	  (cc-error 'SETUP-RENDER-MODE
-		    "Render mode ~a could not be found."
+	      "Render mode ~a could not be found."
 	    render-mode))))
   ;; check if type is render-mode 
   (unless (typep render-mode 'render-mode)
     (cc-error 'SETUP-RENDER-MODE
-	      "~a is not a render-mode."
-	      render-mode))
+	"~a is not a render-mode."
+      render-mode))
   (let ((options (slot-value render-mode 'options))
 	(return-val nil))
     (cond (;; if option and value are given, set new value
 	   (and option value-set)
 	   (setf (slot-value render-mode 'options)
 		 (loop for opt in options collect
-		      (if (eq option (car opt))
-			  (progn
-			    (setq return-val t)
-			    (list option value))
-			  opt))))
+					  (if (eq option (car opt))
+					      (progn
+						(setq return-val t)
+						(list option value))
+					      opt))))
 	  ;; if only option, return the current value
 	  (option
 	   (loop for opt in options do
-		(when (eq option (car opt))
-		  (setq return-val (second opt)))))
+	     (when (eq option (car opt))
+	       (setq return-val (second opt)))))
 	  ;; otherwise, print a list of options and
 	  ;; current values
 	  (t
 	   (loop for opt in options do
-		(format t "~&~a: ~a"
-			(first opt) (second opt)))))
+	     (format t "~&~a: ~a"
+		     (first opt) (second opt)))))
     return-val))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

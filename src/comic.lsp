@@ -102,7 +102,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod get-slots append ((obj comic))
-  '(title subtitle author date))
+  '(title subtitle author date protagonists))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-clone-duplicate-events (events)
@@ -277,6 +277,7 @@
        author
        (date (todays-date))
        events
+       protagonists
        &allow-other-keys)
 ;;; ****
   ;;an empty variable to be filled with arguments for make-instance
@@ -295,6 +296,11 @@
                not ~a." arg (type-of val)))
 	 (push val set-slots)
 	 (push (make-keyword arg) set-slots))
+    ;;type-check protagonists and add to the list
+    (when (and protagonists (type-or protagonists
+				     '(list protagonist)))
+      (push protagonists set-slots)
+      (push :protagonists set-slots))
     ;; type-check event-slots and add to the list
     (loop for arg in (cc-get :event-slots)
 	  for val = (getf args (make-keyword (car arg)))
@@ -332,7 +338,7 @@
 ;;; comic.lsp
 ;;;
 ;;; Description
-;;; Returns the event with the given ID from a comic.
+;;; Returns the event with the given ID from a comic (or event).
 ;;;
 ;;; Parameter
 ;;; comic: the comic
@@ -345,7 +351,7 @@
 ;;; 2020/02/09
 ;;;
 ;;; Synopsis
-(defmethod get-event-by-id ((comic comic) id)
+(defmethod get-event-by-id ((comic event) id)
 ;;; ****
   (doevents (e comic)
     (when (eq (id e) id)

@@ -125,15 +125,7 @@
 		  (:output-dir . "/tmp/")
 		  (:tmp-dir . "/tmp/")
 		  (:external-program-call . sb-ext:run-program))
-    (:output-types . ((:sound wav)
-		      ;; :sound-modes always depend on
-		      ;; :clm when mixing is used!
-		      (:video mp4)
-		      (:notation pdf)
-		      (:midi mid)
-		      (:image png)
-		      (:text txt)
-		      (:other comic)))
+    (:output-types . (:sound)) ; (mix) depends on :clm
     ;; all defined render-modes will be collected here:
     (:render-modes . nil)
     ;; all defined protagonists will be collected here:
@@ -159,8 +151,6 @@
 		     (events event list)))
     ;; name of current comic during render:
     (:current-project-name . nil)
-    ;; sample rate for writing audio-files (?!)
-    ;; (:sample-rate . 48000)
     ;; implementation-based call for running external programs,
     ;; default for sbcl
     (:external-program-call . #'sb-ext:run-program)

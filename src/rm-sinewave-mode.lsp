@@ -73,10 +73,12 @@
 		  (let* ((out-file
 			  (make-tmp-file
 			   nil "wav"
-			   (format nil "/sinewave-mode_~a" (name protagonist))))
+			   (format nil "sinewave-mode")))
 			 (out-channels (clm-get-channels protagonist))
 			 (inst-calls
-			  (loop for e in (flat events) collect
+			   (loop for e in (flat events)
+				 unless (zerop (value e 'secs 'duration))
+				 collect
 			       (list
 				'clm::additive-synthesis
 				(%-> (pitch e) 0 22000 'hz)
@@ -94,10 +96,10 @@
 		    ;; (ensure-directories-exist out-file)
 		    ;; only compile file if not already compiled
 		    (if (probe-file fasl-file)
-			(load (src-dir "add-synth"))
+			(load (src-dir "clm-add-synth"))
 			(load (compile-file ins-file)))
 		    (eval `(clm::with-sound
-			       (:output ,out-file
+			       (:output ,(ensure-directories-exist out-file)
 					:srate ,sample-rate
 					:clipped nil
 					:play nil

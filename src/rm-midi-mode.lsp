@@ -68,29 +68,23 @@
 		  :required-packages (:cm)
 ;;; ****
 		  :header-code
-		  (cm::events
-		   (loop for e in events collect
-			(cm::new cm::midi
-			  :time (float (value e 'secs 'start-time))
-			  :duration (float (value e 'secs 'duration))
-			  :keynum (round (value e 'midinote 'pitch))
-			  :amplitude (float
-				      (let ((val (value e 'amp 'amplitude)))
-					(if val val (/ 80.0 127))))))
-		   (ensure-directories-exist
-		    (absolute-path
-		     (format nil 
-			     "~a-midi-mode.mid"
-			     (name protagonist)))))
-		  :footer-code
-		  (let ((outfile (absolute-path
-				  (format nil 
-					  "~a-midi-mode.mid"
-					  (name protagonist)))))
-		    ;; when midi-mixing is implemented,
-		    ;; return path, but write the file to tmp-dir
+		  (let ((outfile
+			  (make-tmp-file nil "mid" "midi-mode")))
+		    (cm::events
+		     (loop for e in events
+			   collect
+			   (cm::new cm::midi
+			     :time (float (value e 'secs 'start-time))
+			     :duration (float (value e 'secs 'duration))
+			     :keynum (round (value e 'midinote 'pitch))
+			     :amplitude (float
+					 (let ((val (value e 'amp 'amplitude)))
+					   (if val
+					       val
+					       (/ 80.0 127))))))
+		     outfile)
 		    (when (probe-file outfile)
-		      (setq return-file-path t))))
+		      (setq return-file-path outfile))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EOF

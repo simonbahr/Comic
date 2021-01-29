@@ -1,3 +1,32 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                    *=*:        ;;
+;;                                         -   -  -  -              :===:         ;;
+;;                                                                 *==:           ;;
+;;        :-          -  --  +  +- :+  *  +- :+  =  *: :+  *  ::-=*-    :++:      ;;
+;;         *===:     +===*    -       -+++-     :=:           - +*   *WWWWWWWWW@- ;;
+;;         =======*-*  +===* -=+-+****++++++++++++*#@@W#*==#WWW+   -WWWW+   -#WWW:;;
+;;            -+*####=+   :===*+++++++*#@@WW*+++++WWWWW@+++=WWW=: -@WWW  -    :-  ;;
+;;               -  :+*####WWW@#*++++++WWWWWW++++*WWWWWW*++*WWW@++=WWW*           ;;
+;;       -:::-  -:  :-=WWWWWWWWWWW@++++@WWWWW@+++*WW#WWW#+++#WWW++*WWW@- --       ;;
+;;   -#WWWWWWWWW+:+*=@WWW=+++++*WWWW*++=WWW=WW#++=WW*@WW@+++*WWW=++#WWW=*:     #WW;;
+;;  =WWW#-:  =WWW#=*=WWW*++++++++@WW@++*WWW#=WW=+=WW*#WWW*+++WWW#+++WWWW:  :+-*WWW;;
+;; +WWW:      -:- *=#WWW+++++++++=WWW=++@WW@+#WW*#WW+*WWW#+++#WWW+++*@WWWWWWWWWW@-;;
+;; #WW@   -  -: -#=+=WWW*+*+*++++=WWW=++#WWW*+@WW@W@++@WW@+++=WWW=+*++**#WWW@=:   ;;
+;; =WWW      -+*#=***WWWW**+*+**+@WWW+*+*WWW#++@WWW@++#WWW*+++#=**+++++=: -       ;;
+;; :WWW*       +WWW=**WWWW#****#WWWW*****@WW@***@#=*+*+*++++++++++++++**          ;;
+;;  *WWW* -  -*WWW@#***=WWWWWWWWWW=*****************************+*+**+*=*-        ;;
+;;   :WWWWWWWWWWW@@@#******===*************************************=#---          ;;
+;;     :@WWWWWW=:: :++#=******************************************=*              ;;
+;;  -@@@@@#*-  -=#: --+==***********************************=*##=*=#:             ;;
+;;   @=:   -*@@*       =====##*=#=**=**********************==+= +@=-              ;;
+;;                   -  :  +*@@#*:**==***=****=*****==+--:*#- -@* +@@@+           ;;  
+;;                      :#@@#- :+      +#:*+-   -*#-            #@- :#==*:        ;;
+;;                   *@@@@#-             -                                        ;;
+;;                      :-                                                        ;;
+;; COMIC 1                                                                        ;;
+;; Media-Integrative Composition in Common Lisp                        Simon Bahr ;;
+;; cc/gui.lsp                                                                2020 ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (in-package :comic)
 
 
@@ -28,8 +57,8 @@
    (x-max :accessor x-max :initform nil)
    (y-min :accessor y-min :initform nil)
    (y-max :accessor y-max :initform nil)
-   (app-height :accessor app-height :initform 0)
-   (app-width :accessor app-width :initform 0)
+   (main-height :accessor main-height :initform 0)
+   (main-width :accessor main-width :initform 0)
    (x-zoom :accessor x-zoom :initform 100)
    (y-zoom :accessor y-zoom :initform 100)
    (x-unit :accessor x-unit :initform nil)
@@ -44,11 +73,11 @@
 	  (src-dir "comic-icon.png")
   	  :format :png))
   (:panes
-   (app :application
+   (main :application
 	:height 850
 	:width 900
 	:scroll-bars t
-	:display-function #'display-app
+	:display-function #'display-main
 	:background (clim:make-rgb-color 0.95 0.95 0.95)
 	:text-style (clim:make-text-style :fix :roman 12))
    (set-view 
@@ -93,12 +122,12 @@
     (clim:horizontally ()
       (clim:scrolling (:width 200) (clim:vertically () tree sel ;; int
 						    ))
-      (clim:vertically () app set-view)))))
+      (clim:vertically () main set-view)))))
 
 (defgeneric draw (obj x1 x2 y1 y2 color))
 
 (defmethod draw ((obj event) x1 x2 y1 y2 color)
-  (let ((stream (clim:get-frame-pane clim:*application-frame* 'app)))
+  (let ((stream (clim:get-frame-pane clim:*application-frame* 'main)))
     (clim:with-output-as-presentation
 	(stream obj 'event)
       (clim:draw-rectangle*
@@ -132,8 +161,8 @@
 		 v-min v-max)))
 
 
-(defun update-display-app-data ()
-  (let* ((pane (clim:get-frame-pane clim:*application-frame* 'app))
+(defun update-display-main-data ()
+  (let* ((pane (clim:get-frame-pane clim:*application-frame* 'main))
 	 (x-slot (x-slot clim:*application-frame*))
 	 (y-slot (y-slot clim:*application-frame*))
 	 (x-get (x-get clim:*application-frame*))
@@ -186,17 +215,17 @@
 	  (x-max clim:*application-frame*) x-max
 	  (y-min clim:*application-frame*) y-min
 	  (y-max clim:*application-frame*) y-max
-	  (app-height clim:*application-frame*) pane-height
-	  (app-width clim:*application-frame*) pane-width)))
+	  (main-height clim:*application-frame*) pane-height
+	  (main-width clim:*application-frame*) pane-width)))
 
 
     
 ;; (defun convert-coordinate () ...)
 ;; MORE ABSTRACTIONS!
-(defun display-app (frame pane)
+(defun display-main (frame pane)
   (declare (ignore frame))
   ;; make sure all display-values are valid:
-  (update-display-app-data)
+  (update-display-main-data)
   (let* ((x-slot (x-slot clim:*application-frame*))
 	 (y-slot (y-slot clim:*application-frame*))
 	 (x-get (x-get clim:*application-frame*))
@@ -209,8 +238,8 @@
 	 (sel-id (when (eventp sel) (id sel)))
 	 (sel-child-ids nil)
 	 (the-comic (the-comic clim:*application-frame*))
-	 (pane-width (app-width clim:*application-frame*))
-	 (pane-height (app-height clim:*application-frame*))
+	 (pane-width (main-width clim:*application-frame*))
+	 (pane-height (main-height clim:*application-frame*))
 	 (x-min (x-min clim:*application-frame*))
 	 (x-max (x-max clim:*application-frame*))
 	 (y-min (y-min clim:*application-frame*))
@@ -348,8 +377,8 @@
   (eval (read-from-string (clim:accept 'string :prompt prompt))))
 
 (defun value-dialog (title &rest names-types-defaults)
-  (let ((stream (clim:get-frame-pane clim:*application-frame* 'app)))
-    (clim:window-clear stream)
+  (clear-main-pane)
+  (let ((stream (clim:get-frame-pane clim:*application-frame* 'main)))
     (let ((vals
 	    (clim:accepting-values (stream :own-window nil
 					   :resynchronize-every-pass nil)
@@ -374,6 +403,11 @@
       (if (= 1 (length vals))
 	  (car vals) ; if only one query, return the atom directly
 	  vals)))) ; else, return a list of entered values
+
+(defun clear-main-pane ()
+  (let ((stream (clim:get-frame-pane clim:*application-frame* 'main)))
+    (clim:window-clear stream)))
+
 
 ;;;
 ;;; Comic-Editor-Commands
@@ -401,9 +435,9 @@
 
 ;;; menu-choose --> auch interessant?
 (define-comic-editor-command (com-edit :name t) ((obj named-object))
-  (let ((stream (clim:get-frame-pane clim:*application-frame* 'app))
+  (let ((stream (clim:get-frame-pane clim:*application-frame* 'main))
 	(ignore-slots '(events id)))
-    (clim:window-clear stream)
+    (clear-main-pane)
     (clim:accepting-values (stream :own-window nil
 				   :resynchronize-every-pass t)
       (clim:with-room-for-graphics (stream :height 50 :first-quadrant nil)
@@ -511,7 +545,7 @@
 (clim:make-command-table 'menubar-command-table
 			 :errorp nil
 			 :menu '(("Comic" :menu comic-command-table)
-				 ("Event" :menu event-command-table)))
+				 ("Render" :menu render-command-table)))
 
 (clim:make-command-table
  'comic-command-table
@@ -520,12 +554,43 @@
 	 ("Save to file" :command com-save)
 	 ("Load from file" :command com-load)
 	 ("Load from lisp" :command  com-load-from-lisp)
-	 ("Preferences..." :command com-preferences)
+	 ;; ("Preferences..." :command com-preferences)
 	 ("Quit" :command com-quit)))
 
-(clim:make-command-table 'event-command-table
-                    :errorp nil
-                    :menu '())
+(clim:make-command-table
+ 'render-command-table
+ :errorp nil
+ :menu '(("Render entire Comic"
+	  :command com-render-comic)
+	 ("Render single Protagonist"
+	  :command com-render-protagonist)
+	 ("Render by Output-Type"
+	  :command com-render-by-output-type)))
+
+(define-comic-editor-command (com-render-comic :name t) ()
+  (render (the-comic clim:*application-frame*)))
+
+(define-comic-editor-command (com-render-protagonist :name t) ()
+  (clim:window-clear stream)
+  (let ((name (value-dialog "Render single Protagonist"
+			    '("name" symbol))))
+    (render (the-comic clim:*application-frame*)
+	    :protagonists-filter-proc
+	    (lambda (prots)
+	      (loop for p in prots
+		    when (eq (name p) name)
+		      collect p)))))
+
+(define-comic-editor-command (com-render-by-output-type :name t) ()
+  (clim:window-clear stream)
+  (let ((type (value-dialog "Render by Output-Type"
+			    '("type (keyword)" symbol))))
+    (render (the-comic clim:*application-frame*)
+	    :protagonists-filter-proc
+	    (lambda (prots)
+	      (loop for p in prots
+		    when (eq (output-type p) type)
+		      collect p)))))
 
 
 (defun cc-start-gui-editor (&optional comic)
@@ -543,15 +608,13 @@
 (push :comic-gui-editor *features*)
 
 
-
-(defun print-on-app (control-string &rest format-arguments)
+(defun print-on-main (control-string &rest format-arguments)
   (if (stringp control-string)
-      (apply #'format (clim:get-frame-pane clim:*application-frame* 'app)
+      (apply #'format (clim:get-frame-pane clim:*application-frame* 'main)
 	     control-string format-arguments)
-      (format (clim:get-frame-pane clim:*application-frame* 'app)
+      (format (clim:get-frame-pane clim:*application-frame* 'main)
 	      "~a" control-string)))
   
-
 
 (defun get-pointer-position (pane)
   (multiple-value-bind (x y) (clim:stream-pointer-position pane)
@@ -566,8 +629,8 @@
 	 (y-unit (y-unit clim:*application-frame*))
 	 (x-zoom (x-zoom clim:*application-frame*))
 	 (y-zoom (y-zoom clim:*application-frame*))
-	 (pane-width (app-width clim:*application-frame*))
-	 (pane-height (app-height clim:*application-frame*))
+	 (pane-width (main-width clim:*application-frame*))
+	 (pane-height (main-height clim:*application-frame*))
 	 (x-min (x-min clim:*application-frame*))
 	 (x-max (x-max clim:*application-frame*))
 	 (y-min (y-min clim:*application-frame*))
@@ -596,14 +659,14 @@
 		      (let ((frame clim:*application-frame*))
 			(eq (clim:pointer-sheet (clim:port-pointer
 						 (clim:port frame)))
-			    (clim:get-frame-pane frame 'app)))))
+			    (clim:get-frame-pane frame 'main)))))
     (object)
   (get-pointer-position
-      (clim:get-frame-pane clim:*application-frame* 'app)))
+      (clim:get-frame-pane clim:*application-frame* 'main)))
 
 ;; (define-dragndrop-command (com-move-object)
 ;;     ((original circle))
-;;   (let ((pane (clim:get-frame-pane *application-frame* 'app)))
+;;   (let ((pane (clim:get-frame-pane *application-frame* 'main)))
 ;;     (multiple-value-bind (x y)
 ;; 	(clim:dragging-output (pane :finish-on-release t)
 ;; 	  (clim:draw-circle pane (get-pointer-position pane)

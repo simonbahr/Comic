@@ -125,51 +125,49 @@
 ;;;
 ;;; Synopsis
 (defun make-protagonist (output-type
-			   &key
-			     name
-			     (location '(0))
-			     (expansion '(0))
-			     render-modes
-			     (can-render-simultaneous-events t))
+			 &key
+			   name
+			   (location '(0))
+			   (expansion '(0))
+			   render-modes
+			   (can-render-simultaneous-events t))
 ;;; ****
   (setq render-modes
-	(loop for mode in (flat render-modes) collect
-	     (progn
-	       (let ((the-mode (get-render-mode mode)))
-		 (unless the-mode
-		   (cc-error 'MAKE-PROTAGONIST
-		       "The render-mode ~a could not be found." mode))
-		 (if (eq (output-type the-mode) output-type)
-		     the-mode
-		     (cc-error 'MAKE-PROTAGONIST
-			 "The output-type ~a~%of render-mode ~a does not match~%~
+	(loop for mode in (flat render-modes)
+	      collect
+	      (progn
+		(let ((the-mode (get-render-mode mode)))
+		  (unless the-mode
+		    (cc-error 'MAKE-PROTAGONIST
+			"The render-mode ~a could not be found." mode))
+		  (if (eq (output-type the-mode) output-type)
+		      the-mode
+		      (cc-error 'MAKE-PROTAGONIST
+			  "The output-type ~a~%of render-mode ~a does not match~%~
                   the specified output-type of the protagonist (~a)."
-		       (output-type the-mode) the-mode output-type))))))
+			(output-type the-mode) the-mode output-type))))))
   (ensure-list location) (ensure-list expansion)
-  (cond ((not (assoc output-type (cc-get :output-types)))
-	 (cc-error 'MAKE-PROTAGONIST
-	     "The output-type ~a could not be found in +cc-data+.~%~
-              You can add new output-types using (add-output-type)."
-	   output-type))
-	((and (not (null expansion))
-	      (not (eq (length location)
-		       (length expansion))))
-	 (cc-error 'MAKE-PROTAGONIST "location (~a) and ~
+  (unless (member output-type (cc-get :output-types))
+    (add-output-type output-type))
+  (when (and (not (null expansion))
+	     (not (eq (length location)
+		      (length expansion))))
+    (cc-error 'MAKE-PROTAGONIST "location (~a) and ~
                    expansion (~a)~%must be lists of equal length."
-		location expansion)))
+      location expansion))
   (let ((obj
-	 (make-instance 'protagonist
-			:name (if name name "anonymous protagonist")
-			:location location
-			:expansion expansion
-			:output-type output-type
-			:render-modes render-modes
-			:can-render-simultaneous-events
-			can-render-simultaneous-events)))
+	  (make-instance 'protagonist
+			 :name (if name name 'anonymous-protagonist)
+			 :location location
+			 :expansion expansion
+			 :output-type output-type
+			 :render-modes render-modes
+			 :can-render-simultaneous-events
+			 can-render-simultaneous-events)))
     (when name
       (cc-set :protagonists (acons name obj (cc-get :protagonists))))
     obj))
-    
+
 ;; print-method for protagonists
 (defmethod print-object ((obj protagonist) stream)
   (let ((name (name obj))
@@ -177,7 +175,7 @@
   	(expansion (expansion obj))
   	(output-type (slot-value obj 'output-type))
   	(render-modes (render-modes obj)))
-    (format stream "#<RENDER-OBJECT")
+    (format stream "#<PROTAGONIST")
     (when name (format stream ", name: ~a" name))
     (when output-type (format stream ", output-type: ~s" output-type))
     (when location (format stream ", location: ~{~a~^ ~}" location))
@@ -211,6 +209,31 @@
 ;;; Synopsis
 (defun get-protagonist (name)
   (cc-get :protagonists name))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****f* protagonist/protagonistp
+;;; Name
+;;; protagonistp
+;;;
+;;; File
+;;; protagonist.lsp
+;;;
+;;; Description
+;;; Returns t if obj is a protagonist.
+;;;
+;;; Arguments
+;;; obj: any object
+;;;
+;;; Return Value
+;;; boolean
+;;;
+;;; Last Modified
+;;; 2021/01/28
+;;;
+;;; Synopsis
+(defun protagonistp (obj)
+  (when (typep obj 'protagonist) t))
 ;;; ****
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

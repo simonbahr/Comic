@@ -165,7 +165,6 @@
     ;; we will modify the event a lot from here on
     ;; this is why a clone will be passed to the protagonist,
     ;; not the original from the comic
-    (setq event (clone event))
     (loop for obj in (flat protagonists)
        do
 	 (setq modes
@@ -210,9 +209,10 @@
 	  ;;     values will now range from 0 to 1)
 	  (location event
 		    (loop for pt in pt-on-obj
-		       for loc in (location the-obj)
-		       for exp in (expansion the-obj) collect
-			 (if (zerop exp) 0 (/ (- pt loc) (* 1/2 exp)))))
+			  for loc in (location the-obj)
+			  for exp in (expansion the-obj)
+			  collect
+			  (if (zerop exp) 0 (/ (- pt loc) (* 1/2 exp)))))
 	  ;; ...the expansion to the expansion in relation to the
 	  ;;    protagonists expansion (also zero to one)
 	  (expansion event
@@ -301,7 +301,7 @@
 ;;; 2020/05/14
 ;;;
 ;;; Synopsis
-(defgeneric render (comic protagonists
+(defgeneric render (comic
 		    &rest args
 		    &key
 		      print
@@ -310,19 +310,30 @@
 		      output-dir
 		      mix
 		      tidy-up
-		      &allow-other-keys))
+		      protagonists-filter-proc
+		    &allow-other-keys))
 ;;; ****
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; :before-methods prepare the render-process                   ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod render :before ((obj comic) protagonists
-			   &rest args &key
-					print
+(defmethod render :before ((obj comic)
+			   &rest args
+			   &key
+			     print
 			   &allow-other-keys)
   (declare (ignore args))
   (when print (cc-set :verbose t))
   (cc-set-render-data 'comic obj)
+  ;; protagonists may be set by symbols or objects.
+  ;; symbols will be found in +cc-data+ if prot. was defined using
+  ;; (make-protagonist) before:
+  (cc-set-render-data 'protagonists
+		      (loop for prot in (flat (protagonists obj))
+			    collect
+			    (if (symbolp prot)
+				(get-protagonist prot)
+				prot)))
   (cc-set-render-data 'title (title obj))
   (cc-set-render-data 'subtitle (subtitle obj))
   (cc-set-render-data 'author (author obj))
@@ -330,7 +341,7 @@
   (cc-set-render-data 'project-name (name obj)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod render :before ((obj event) protagonists
+(defmethod render :before ((obj event)
 			   &rest args
 			   &key
 			     print
@@ -341,18 +352,10 @@
   ;;set project name if not set by comic-name before
   (unless (cc-get-render-data 'project-name)
     (cc-set-render-data 'project-name (cc-get :current-project-name)))
-  ;;find and set protagonists
-  (cc-set-render-data 
-   protagonists
-   (loop for ren-ob in (flat protagonists)
-	 collect
-	 (if (symbolp ren-ob)
-	     (get-protagonist ren-ob)
-	     ren-ob)))
   ;; if a single event should be rendered, we insert a dummy as subevent
   ;; that will inherit all slots from the parent. Simple solution.
   (unless (events obj)
-    (events obj (make-event)))
+    (events obj (list (make-event))))
   (when call-space-superhero
     (call-superhero space-superhero obj))
   ;; make sure the comic-object is prepared
@@ -363,7 +366,15 @@
     (cc-check-dependencies (render-modes e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod render :before ((obj placed-object) protagonists
+;; distinction between event and placed-object method came from the
+;; inital plan to write methods for protagonists as well. As for now,
+;; this will not be done, because a protagonist does not know which
+;; comic it belongs to. So to only render a certain protagonist, call
+;; (render comic...) and give a :protagonist-filter-proc that will
+;; only return the desired protagonist. :protagonist-filter-procs are
+;; a very powerful way to handle special sitation, e.g. rendering
+;; only :sound, or everything except :video, and so forth...
+(defmethod render :before ((obj placed-object)
 			   &rest args
 			   &key
 			     output-dir
@@ -384,41 +395,53 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; For lists: simply render each item
-(defmethod render ((obj list) protagonists
-		   &rest args &key &allow-other-keys)
-  (loop for elem in obj do
-       (apply #'render elem protagonists args)))
+;; DON'T USE! THE BEHAVIOUR WILL NOT BE AS EXPECTED.
+;; The method would render each element seperately...
+;; (defmethod render ((obj list)
+;; 		   &rest args &key &allow-other-keys)
+;;   (loop for elem in obj do
+;;     (apply #'render elem args)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; This method ensures that always a clone of the object is rendered,
+;; leaving the original object untouched! (:around is called before
+;; the :before methods!) 
+(defmethod render :around ((obj event)
+			   &rest args)
+  (apply #'call-next-method (clone obj) args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod render ((obj comic)
-		   protagonists
 		   &rest args
 		   &key
-		     &allow-other-keys)
+		   &allow-other-keys)
   (declare (ignore args))
   ;; Append comic-name as folder-name to output-dir
   (when (name obj)
     (cc-set-render-data 'output-dir
 			(cc-concat-paths
 			 (cc-get-render-data 'output-dir)
-			 (name obj))))
+			 (format nil "~:(~a~)" (name obj)))))
   (call-next-method))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod render ((obj event)
-		   protagonists
 		   &rest args
 		   &key
-		     protagonists-to-ignore
+		     protagonists-filter-proc
 		     (mix t)
 		     print
 		   &allow-other-keys)
   (declare (ignore args))
-  ;;find protagonists by names and put them in a flat list:
-  (setq protagonists (ensure-protagonists protagonists))
-  (setq protagonists-to-ignore
-	(ensure-protagonists protagonists-to-ignore))
-  (let* ((output-dir (cc-get-render-data 'output-dir))
+  (let* (; find protagonists and put them in a flat list:
+	 (protagonists
+	   (ensure-protagonists (cc-get-render-data 'protagonists)))
+	 ;;filter protagonists by filter proc if set:
+	 (filtered-protagonists
+	   (if protagonists-filter-proc
+	       (funcall protagonists-filter-proc protagonists)
+	       protagonists))
+	 (output-dir (cc-get-render-data 'output-dir))
 	 (success nil))
     (format t "~&Starting to render to ~a" output-dir)
     ;; pre-select render modes by required-slots
@@ -426,82 +449,120 @@
       (format t "~&Pre-selecting render-modes..."))
     (cc-pre-select-render-modes obj)
     ;; the render-process:
-    (when (or print (when-verbose))
-      (format t "~&Selecting protagonists for events..."))
-    (doevents (e obj)
-      (cc-find-protagonist e protagonists print))
-    (labels (;; The helper function renders all events to one protagonist
-	     ;; It looks for the mode of the first object, renders all events
-	     ;; with that mode and repeats the process as long as any events are
-	     ;; left.
-	     (helper (events protagonist)
-	       (let (;; set current-mode to render-mode of first event
-		     (current-mode (render-modes (car events)))
-		     (current-events)
-		     (remaining-events))
-		 ;; select all events with current mode
-		 (loop for e in events collect
-		      (if (eq current-mode (render-modes e))
-			  (push e current-events)
-			  (push e remaining-events)))
-		 ;; render events with current-mode to
-		 ;; current-object
-		 (when (and current-mode current-events)
-		   ;; ensure the events are sorted by start-time
-		   (sort-by-start-time current-events)
-		   ;; (when (or print (when-verbose))
-		   ;;   (format
-		   ;;    t "~&Rendering event(s) with ID(s) ~{~a~^, ~}~%~
-                   ;;          with render-mode ~a ~%to protagonist ~a..."
-		   ;;    (mapcar #'id current-events) (name current-mode)
-		   ;;    (name protagonist)))
-		   (let ((return-file
-			  ;; Call to render-mode-code happens here:
-			  (render-events current-events
-					 current-mode
-					 protagonist
-					 print)))
-		     (when (type-or return-file '(string pathname))
-		       (push return-file
-			     (slot-value protagonist 'output-files)))
-		     (unless return-file
-		       (format
-			t "~&Render-mode ~a returned nil after call with~%~
+    ;; either with or without protagonists!
+    (if protagonists
+	;;
+	;;
+	;; WITH PROTAGONISTS:
+	;;
+	(progn
+	  (when (or print (when-verbose))
+	    (format t "~&Selecting protagonists for events..."))
+	  (doevents (e obj)
+	    (cc-find-protagonist e protagonists print))
+	  (labels (;; The helper function renders all events to one protagonist
+		   ;; It looks for the mode of the first object, renders all events
+		   ;; with that mode and repeats the process as long as any events are
+		   ;; left.
+		   (helper (events protagonist)
+		     (let (;; set current-mode to render-mode of first event
+			   (current-mode (render-modes (car events)))
+			   (current-events)
+			   (remaining-events))
+		       ;; select all events with current mode
+		       (loop for e in events
+			     collect
+			     (if (eq current-mode (render-modes e))
+				 (push e current-events)
+				 (push e remaining-events)))
+		       ;; render events with current-mode to
+		       ;; current-object
+		       (when (and current-mode current-events)
+			 ;; ensure the events are sorted by start-time
+			 (sort-by-start-time current-events)
+			 (let ((return-file
+				 ;; Call to render-mode-code happens here:
+				 (render-events current-events
+						current-mode
+						protagonist
+						print)))
+			   (when (type-or return-file '(string pathname))
+			     (push return-file
+				   (slot-value protagonist 'output-files)))
+			   (unless return-file
+			     (format
+			      t "~&Render-mode ~a returned nil after call with~%~
                             protagonist ~a. Maybe the render process failed."
-			current-mode protagonist))
-		     (when remaining-events
-		       (helper remaining-events protagonist)))))))
-      (loop for ren-obj in protagonists do
-	   ;; do not render protagonist if on ignore-list
-	   (unless (member ren-obj protagonists-to-ignore)
-	     (format t "~&Rendering ~d events to protagonist ~a"
-		     (length (events ren-obj)) (name ren-obj))
-	     (helper (events ren-obj) ren-obj)
-	     (when (output-files ren-obj)
-	       (setq success t))
-	     (if mix
-		 (mix (output-type ren-obj)
-		      (absolute-path
-		       (format nil "~a.~a"
-			       (name ren-obj)
-			       (get-output-type-suffix
-				(output-type ren-obj))))
-		      (output-files ren-obj)
-		      :print print
-		      ;; :sample-rate (cc-get :sample-rate)
-		      )
-		 (loop for file in (output-files ren-obj)
-		    do
-		      (cp-to-project-dir file))))
-	   ;; reset the object
-	   (setf (output-files ren-obj) nil)
-	   (events ren-obj nil)))
+			      current-mode protagonist))
+			   (when remaining-events
+			     (helper remaining-events protagonist)))))))
+	    ;; render only to filtered protagonists!
+	    (loop for ren-obj in filtered-protagonists do
+	      (format t "~&Rendering ~d events to protagonist ~a"
+		      (length (events ren-obj)) (name ren-obj))
+	      (helper (events ren-obj) ren-obj)
+	      (when (output-files ren-obj)
+		(setq success t))
+	      (if mix
+		  (mix (output-type ren-obj)
+		       (absolute-path
+			(format nil "~:(~a~)" (name ren-obj)))
+		       (output-files ren-obj)
+		       :print print
+		       ;; :sample-rate (cc-get :sample-rate)
+		       )
+		  (loop for file in (output-files ren-obj)
+			do
+			   (cp-to-project-dir
+			    file t 
+			    (format nil "~:(~a~)" (name ren-obj)))))
+	      ;; reset the object
+	      (setf (output-files ren-obj) nil)
+	      (events ren-obj nil))))
+	  ;;
+	  ;;
+	  ;; WITHOUT PROTAGONISTS:
+	  ;;
+	  (let* ((events (events obj))
+		 (modes nil))
+	    (format t "~&No protagonists found. ~
+                      Rendering the simple way...")
+	    ;; find all modes first
+	    (loop for e in events
+		  for m = (get-render-mode
+			   (car (flat (render-modes e))))
+		  do
+		     (unless (member m modes)
+		       (push m modes)))
+	    ;; render all events with same mode
+	    (loop for m in (reverse modes)
+		  do
+		     (let ((evs
+			     (loop for e in events
+				   when (eq m
+					    (car
+					     (flat
+					      (render-modes e))))
+				     collect e)))
+		       (format t "~&Rendering ~d events with render-mode ~a"
+			       (length evs) (name m))
+		       ;; start to render with mode m:
+		       (let ((return-file
+			       (render-events evs m nil print)))
+			 ;; check if mode return anything:
+			 (if return-file
+			     (when (type-or return-file '(string pathname))
+			       (cp-to-project-dir return-file))
+			     (format
+			      t "~&Render-mode ~a returned nil~
+                            Maybe the render process failed."
+			      m)))))))
     (format t "~&RENDER PROCESS FINISHED.~%~
                Files rendered to ~a~%----------~%" output-dir)
     t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod render :after ((obj placed-object) protagonists
+(defmethod render :after ((obj placed-object)
 			  &rest args
 			  &key
 			    (tidy-up t)
@@ -521,3 +582,5 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EOF render.lsp
+
+

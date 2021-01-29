@@ -57,17 +57,19 @@
 ;;; 2020/02/10
 ;;;
 ;;; Synopsis
-(defun add-output-type (name format)
+(defun add-output-type (name)
 ;;; ****
-  (cc-set :output-types (acons name format (cc-get :output-types)))
-  (cons name format))
+  (cc-push name :output-types)
+  name)
+  ;; (cc-set :output-types (acons name format (cc-get :output-types)))
+  ;; (cons name format))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Not sure if this is needed...
-(defun get-output-type-suffix (output-type)
-  (loop for (type suffix) in (cc-get :output-types)
-     do
-       (when (eq type output-type) (return suffix))))
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ;;; Not sure if this is needed...
+;; (defun get-output-type-suffix (output-type)
+;;   (loop for (type suffix) in (cc-get :output-types)
+;;      do
+;;        (when (eq type output-type) (return suffix))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-concat-paths (&rest strings)
@@ -403,7 +405,7 @@
 ;;; ****f* main/cp-to-project-dir
 ;;; Name
 ;;; cp-to-project-dir
-;;;
+;;; 
 ;;; File
 ;;; output.lsp
 ;;;
@@ -419,6 +421,8 @@
 ;;; project-dir should be overwritten. If set to nil, Comic will
 ;;; signal a warning and ask, whether the file should be overwritten
 ;;; if it already exists.
+;;; sub-dir (string): when set, the file is copied to a subdirectory
+;;; in the project directory.
 ;;;
 ;;; Return Value
 ;;; t if file was copied, else nil.
@@ -427,12 +431,16 @@
 ;;; 2020/06/23
 ;;; 
 ;;; Synopsis
-(defun cp-to-project-dir (file &optional (overwrite t))
+(defun cp-to-project-dir (file &optional (overwrite t) sub-dir)
 ;;; ****
   (let ((path (probe-file file)))
     (if path
-	(let ((new-path (absolute-path
-			 (file-namestring path))))
+	(let* ((fname (file-namestring path))
+	       (new-path
+		 (absolute-path
+		  (if sub-dir
+		      (format nil "~a/~a" sub-dir fname)
+		      fname))))
 	  (cp-file file new-path overwrite)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -484,24 +492,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric mix (output-type
-		 output-file
+		 filepath-without-extension
 		 files-or-content
 		 &key &allow-other-keys))
 
-(defmethod mix (output-type output-file
+(defmethod mix (output-type
+		filepath-without-extension
 		files-or-content
 		&key print
-		  &allow-other-keys)
-  (declare (ignore output-file))
+		&allow-other-keys)
   (when print
     (format t
 	    "~&No mixing method specified for output-type ~a. ~
              Copying files to project-directory."
 	    output-type))
   (loop for file in files-or-content
-     do
-       (when (probe-file file)
-	 (cp-to-project-dir file))))
+	do
+	   (when (probe-file file)
+	     (cp-to-project-dir
+	      file t
+	      (file-namestring filepath-without-extension)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric to-code (object))

@@ -435,8 +435,9 @@
 	    (events clone)))
       (when events-in-clone
 	(events clone
-		(loop for ev in (flat events-in-clone) collect
-						       (clone ev))))
+		(loop for ev in (flat events-in-clone)
+		      collect
+		      (clone ev))))
       clone)))
 
 (defmethod clone (ls)

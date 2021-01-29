@@ -66,32 +66,34 @@
 ;;; 2019/12/21
 ;;;
 ;;; Synopsis
-(defmethod mix ((output-type (eql :sound)) output-file
+(defmethod mix ((output-type (eql :sound))
+		filepath-without-extension
 		files
 		&key
 		  (sample-rate 44100)
 		  print
-		  &allow-other-keys)
+		&allow-other-keys)
 ;;; ****
   ;; Check and prepare file-specs
-  (let* ((channels 0)
+  (let* ((output-file (format nil "~a.wav" filepath-without-extension))
+	 (channels 0)
 	 (files
-	  (loop for file in files collect
-	       (let ((probe-sf (probe-file-with-suffix (value file) ".wav")))
-		 (if probe-sf
-		     (let ((chans (clm::mus-channels file)))
-		       (when (> chans channels) (setq channels chans))
-		       (namestring probe-sf))
-		     (cc-error 'MIX-SOUND
-			 "The file ~a does not exist or is not a wave-file.
+	   (loop for file in files
+		 collect
+		 (let ((probe-sf (probe-file-with-suffix (value file) ".wav")))
+		   (if probe-sf
+		       (let ((chans (clm::mus-channels file)))
+			 (when (> chans channels) (setq channels chans))
+			 (namestring probe-sf))
+		       (cc-error 'MIX-SOUND
+			   "The file ~a does not exist or is not a wave-file.
                        You can only mix sound-files with .wav-file-extension."
-		       file))))))
+			 file))))))
     (when print
       (format t "~&Mixing soundfiles..."))
     (when files
       (eval `(clm::with-sound
-		 (:output
-		  ,output-file
+		 (:output ,(ensure-directories-exist output-file)
 		  :srate ,sample-rate
 		  :clipped nil
 		  :scaled-to 1
@@ -101,10 +103,10 @@
 		  :data-format clm::mus-lfloat)
 	       ;; add channels/spacial positioning
 	       ,@(loop for file in files collect
-		      `(clm::cc-add-sound
-			,file 0
-			:channels ,channels))))))
-  (when (probe-file output-file) t))
+		       `(clm::cc-add-sound
+			 ,file 0
+			 :channels ,channels)))))
+    (when (probe-file output-file) t)))
 
 ;; The following two functions are used with cc-samp5 to render a
 ;; soundfile according to its position on a protagonist in a

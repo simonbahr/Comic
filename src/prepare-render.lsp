@@ -50,7 +50,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun ->secs (event)
-  "convert all time-values to seconds as properties"
+  "convert all time-values to seconds as unit-objects"
   (cond ((eventp event)
 	 (doevents (e event)
 	   (when (duration e)
@@ -184,7 +184,11 @@
     shortest-parent))
 
 (defun cc-auto-fill-coordinates (events)
-  "Fill coordinates. All values default to 0" 
+  "Fill coordinates. All values default to 0"
+  ;; ensure all slots are lists
+  (doevents (e events)
+    (location e (flat (location e)))
+    (expansion e (flat (expansion e))))
   (let ((dimensions 1))
     ;; find the maximum dimension first
     (doevents (e events)
@@ -256,36 +260,60 @@
 	    t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun cc-no-times-set? (comic)
+  "Returns t if all durations and start-time slots of a comic are
+     either nil or equal to 0"
+  (let ((ret t))
+    (doevents (e comic)
+      (let ((st (start-time e)) (dur (duration e)))
+	(when st (unless (u-zerop st) (setq ret nil)))
+	(when dur (unless (u-zerop dur) (setq ret nil)))))
+    ret))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun cc-return-first-baby (comic)
+  "Returns the first event in a comic with event-slot = nil"
+  (if (events comic)
+      (cc-return-first-baby (car (flat (events comic))))
+      comic))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-set-parent-duration (comic id &optional print)
+  "Sets the duration of an event (must be a parent) by looking at its
+   children."
   (let ((e (get-event-by-id comic id)))
     (unless (duration e)
       (let* ((min-dur (get-min-dur e))
 	     (max-dur (get-max-dur comic (id e)))
-	     ;; (st (start-time (get-event-by-id comic id)))
 	     (new-val nil))
-	;; (when (and st max-dur)
-	;;   (setq max-dur (- max-dur st)))
-	(cond ((and min-dur max-dur)
-	       (cond ((u= min-dur max-dur)
-		      (setq new-val min-dur))
-		     (t (setq new-val max-dur))))
-	      ((<= min-dur 0)
-	       ;; if there is no max dur and min dur is <= 0, set
-	       ;; the duration according to siblings average duration
-	       (let* ((sib-durs))
-		 (loop for sib in (flat (get-siblings-list comic id))
-		    do
+	(cond
+	  ;; if we have a max dur, choose max-dur.
+	  (max-dur
+	   (setq new-val max-dur))
+	  ;; if there is no max dur and min dur is <= 0, set
+	  ;; the duration according to siblings average duration
+	  ((<= min-dur 0)
+	   (let* ((sib-durs))
+	     (loop for sib in (flat (get-siblings-list comic id))
+		   do
 		      (when (duration sib)
 			(push (duration sib) sib-durs)))
-		 (when (u> (length sib-durs) 0)
-		   (setq new-val (u/ (apply #'u+ sib-durs)
-				    (length sib-durs))))))
-	      ;; if there is only a max-dur, set by max dur
-	      (max-dur
-	       (setq new-val max-dur))
-	       ;; if min dur is > 0 and there is no max-dur,
-	       ;; set the new value to min-dur
-	       (t (setq new-val min-dur)))
+	     (when (> (length sib-durs) 0)
+	       (setq new-val (u/ (apply #'u+ sib-durs)
+				 (length sib-durs))))))
+	  ;; if min dur is > 0 and there is no max-dur,
+	  ;; set the new value to either to min-dur or to the
+	  ;; shortest dur multiplied with siblings amount
+	  (t (setq new-val
+		   (max min-dur
+			(loop for c in (events e)
+			      for dc = (value (duration c) 'secs)
+			      when dc
+				minimize dc into r
+			      finally (return (if r (* r (length
+							  (events
+							   e)))
+						  0)))))))
 	(when new-val
 	  (when print
 	    (format
@@ -307,51 +335,52 @@
 	(format
 	 t "~&Start-time of event with ID ~d set to ~d"
 	 (id (car children)) (->secs 0))))
-    ;; The last events start-time defaults
-    ;; to (- parent-dur child-dur)
-    (let* ((last (car (last children)))
-	   (dur-last (duration last))
-	   (st-last (start-time last)))
-      (when (and dur-last (not st-last))
-	(start-time last (u- parent-dur dur-last))))
     ;; start looping
     (loop for child in children
-       for next-child in (cdr children)
-       for st = (start-time child)
-       for dur = (duration child)
-       for n from 0 do
-	 (unless (start-time next-child)
-	   ;; find bounds for interpolation loop
-	   (loop for c in (nthcdr (1+ n) children)
-	      for m from (1+ n) do
-		(when (start-time c)
-		  (setq next-st
-			(start-time c))
-		  (setq next-child-n m)
-		  (return)))
-	   ;; make interpolation
-	   (let* ((amount (- next-child-n n)))
-	     (unless (<= amount 0)
-	       (when st
-		 (loop for c in (nthcdr n children)
-		    for i below amount
-		    for new-st in (line (secs-> st)
-					(list (secs-> next-st)
-					      amount))
-		    do
-		    ;; when event is too long, reset new start-time
-		    ;; accordingly:
-		      (when (and (duration c)
-				 (u> (u+ new-st (duration c)) parent-dur))
-			(setq new-st (u- parent-dur (duration c))))
-		    ;; set the value (the unless-statement should not be
-		    ;; necassary, just to be 100% sure the value is not set
-		      (unless (start-time c)
-			(when print 
-			  (format
-			   t "~&Start-time of event with ID ~d set to ~d"
-			   (id c) (->secs new-st)))
-			(start-time c new-st))))))))))
+	  for next-child in (cdr children)
+	  for st = (start-time child)
+	  for dur = (duration child)
+	  for n from 0
+	  do
+	     (unless (start-time next-child)
+	       ;; find bounds for interpolation loop
+	       (loop for c in (nthcdr (1+ n) children)
+		     for m from (1+ n)
+		     do
+			(when (start-time c)
+			  (setq next-st (start-time c)
+				next-child-n m)
+			  (return))
+		     finally
+			;; if no next-st found,
+			;; it defaults to end of parent
+			(setq next-st parent-dur
+			      next-child-n (1+ m)))
+	       ;; make interpolation
+	       (let* ((amount (- next-child-n n)))
+		 (unless (<= amount 0)
+		   (when st
+		     (loop for c in (nthcdr n children)
+			   for i below amount
+			   for new-st
+			     in (line (secs-> st)
+				      (list (secs-> next-st)
+					    amount))
+			   do
+			      ;; when event is too long, reset new start-time
+			      ;; accordingly:
+			      (when
+				  (and (duration c)
+				       (u> (u+ new-st (duration c)) parent-dur))
+				(setq new-st (u- parent-dur (duration c))))
+			      ;; set the value (the unless-statement should not be
+			      ;; necassary, just to be 100% sure the value is not set
+			      (unless (start-time c)
+				(when print 
+				  (format
+				   t "~&Start-time of event with ID ~d set to ~d"
+				   (id c) (->secs new-st)))
+				(start-time c new-st))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-auto-complete-durations (parent &optional print)
@@ -400,23 +429,16 @@
 		   finally (return t)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; (defun test (n &optional print)
-;;   (loop for i from 0 below n collect
-;;        (let ((c (make-random-comic)))
-;; 	 (cc-prepare c print)
-;; 	 (format t "~%~%iteration ~d finished." i)
-;; 	 (when print 
-;; 	   (print c))
-;; 	 (let ((check (check-times c)))
-;; 	   (if check
-;; 	       check
-;; 	       c)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-auto-complete-time (comic &optional print)
   (let* ((parent-lists))
+    ;; are all values plausible?
     (check-can-render-times comic)
+    ;; convert all unit-objects to plain numbers in seconds:
     (secs-> comic)
+    ;; in case we have no values at all, set the first "babys" (event
+    ;; without children) duration to 1 second. Just a choice.
+    (when (cc-no-times-set? comic)
+      (duration (cc-return-first-baby comic) 1))
     (doevents (e comic)
       ;; simple auto-completion of durations in case
       ;; all start-times are already set
@@ -470,14 +492,15 @@
       ;; set start-time to start-time child + start-time parent
       (when (and children st-e p)
 	(loop for c in (flat children) do
-	     (let ((st-c (start-time c)))
-	       (when st-c
-		 (start-time c (u+ st-c st-e)))))
+	  (let ((st-c (start-time c)))
+	    (when st-c
+	      (start-time c (u+ st-c st-e)))))
 	;; add the children to the new parent
-	(events p (loop for ev in (flat (events p)) append
-		       (if (eq ev e)
-			   children
-			   (list ev))))))))
+	(events p (loop for ev in (flat (events p))
+			append
+			(if (eq ev e)
+			    children
+			    (list ev))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric prepare (obj &optional
