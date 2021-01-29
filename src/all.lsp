@@ -515,6 +515,7 @@
 (cc-load-files
  "event.lsp"; event/comic classes and methods
  "comic.lsp"
+ "event-generate.lsp"
  "event-transform.lsp"
  "superhero.lsp")
 

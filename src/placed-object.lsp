@@ -204,12 +204,15 @@
      finally (return (sqrt result))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod get-distance ((obj1 placed-object)
-				 (obj2 placed-object))
+			 (obj2 placed-object))
   "Returns the closest distance between two placed objects."
   (let* ((loc1 (location obj1))
 	 (loc2 (location obj2))
 	 (exp1 (expansion obj1))
-	 (exp2 (expansion obj2)))
+	 (exp2 (expansion obj2))
+	 ;; coordinates of centers of objects:
+	 (cen1 (mapcar (lambda (l e) (+ l (/ e 2))) loc1 exp1))
+	 (cen2 (mapcar (lambda (l e) (+ l (/ e 2))) loc2 exp2)))
     (loop for l1 in loc1
        for l2 in loc2
        for e1 in exp1
@@ -217,11 +220,14 @@
        summing (let (;; the distance between the closest
 		     ;; points on outer shell of both objects
 		     (result (if (< l1 l2)
-				 (- (+ l1 (* .5 e1)) (- l2 (* .5 e2)))
-				 (- (+ l2 (* .5 e2)) (- l1 (* .5 e1)))))
+				 ;; (- (+ l1 (* .5 e1)) (- l2 (* .5 e2)))
+				 ;; (- (+ l2 (* .5 e2)) (- l1 (* .5 e1)))))
+				 (- (+ l1 e1) l2)
+				 (- (+ l2 e2) l1 )))
+
 		     ;; the distance between the centers of both
 		     ;; objects
-		     (center-dist (get-distance loc1 loc2)))
+		     (center-dist (get-distance cen1 cen2)))
 		 ;; the outer distance must be less or equal the
 		 ;; distance between the centers. Otherwise, we
 		 ;; have a "negative distance", meaning the objects

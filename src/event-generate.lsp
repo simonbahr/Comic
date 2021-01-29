@@ -33,6 +33,109 @@
 ;;; creation of structures represented as lists of events with
 ;;; subevents, etc.
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****f* event/make-n-events
+;;; Name
+;;; make-n-events
+;;;
+;;; File
+;;; event-generate.lsp
+;;;
+;;; Description
+;;; Handy function for creating n events with same initial
+;;; slot-values. 
+;;;
+;;; Arguments
+;;; n: an integer, the amount of events to return
+;;; args (rest): all args as in make-event
+;;;
+;;; Return Value
+;;; list (of events)
+;;;
+;;; Example
+#|
+(make-n-events 10 :pitch 100) 
+  --> 10 events in a list, all with pitch = 100.
+|#
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(defun make-n-events (n &rest args)
+;;; ****
+  (loop repeat n
+	collect
+	(apply #'make-event args)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****f* event/make-event-tree
+;;; Name
+;;; make-event-tree
+;;;
+;;; File
+;;; event-generate.lsp
+;;;
+;;; Description
+;;; make-event-tree provides a quicker way for declaring a larger
+;;; event-structure without having to call make-event over and over
+;;; again. It uses a simple syntax:
+;;;
+;;; - A number at the beginning of a list indicates an amount of
+;;;   events to generate, all with equal values.
+;;; - Any following list element may either be
+;;;   (a) any keyword argument to make-event, followed by a value.
+;;;   (b) a list, structured in the same way as the first one,
+;;;       indicating a specific amount of sub-events.
+;;;
+;;; Arguments
+;;; event-tree: A list, as specified in Description and Example.
+;;;
+;;; Return Value
+;;; list of events
+;;;
+;;; Example
+#|
+(make-event-tree `((8 :pitch ,(hz 100)
+		      (1 :pitch ,(hz 200))
+		      (2 :pitch ,(hz 300)))
+		   (3 :duration 1
+		      (7 :pitch ,(midinote 66))
+		      (5 :start-time 0))
+		   (4 :render-modes midi-mode
+		      (6))))
+|#
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(defun make-event-tree (event-tree)
+  "Evaluates an event-tree-map and returns a list of events."
+;;; ****
+  (loop for elem in event-tree
+	with car = (car event-tree)
+	with events = nil
+	when (listp elem)
+	  do (setq events
+		   (append events
+			   (make-event-tree elem)))
+	when (not (listp elem))
+	  collect elem into args
+	finally
+	   (return
+	     (if (integerp car)
+		 (apply #'make-n-events
+			car
+			:events events
+			(cdr args))
+		 events))))
+
+
+
+
+
+
 ;;;NOTE WORKING YET:
 
 ;; (defun interpolate-event-sequences (event-seq1 event-seq2 &optional (steps 2))
@@ -66,10 +169,6 @@
 ;; 	      (progn
 ;; 		(format t "len: ~a, nth-int: ~a, n: ~a~%" len nth-int n)
 ;; 		(nth nth-int int-ls)))))))
-
-
-;;e.g.: (comic-maker '((:duration 1) :duration 2 :pitch (hz 100))
-;; (defun comic-maker (nested-args-list))
 
 
 
