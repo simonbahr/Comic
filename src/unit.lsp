@@ -426,6 +426,28 @@
 ;;; ****
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/microsecs
+;;; Name
+;;; microsecs
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a time value in microeconds.
+;;; Base unit: secs
+;;;
+;;; Last Modified
+;;; 2020/06/24
+;;;
+;;; Synopsis
+(make-unit microsecs number
+	   :base-unit secs
+	   :conversion-to-base (/ value 1000000)
+	   :conversion-from-base (* value 1000000))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****U* unit/msecs
 ;;; Name
 ;;; msecs
@@ -489,6 +511,129 @@
 	   :base-unit secs
 	   :conversion-to-base (* value 3600)
 	   :conversion-from-base (/ value 3600))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/meter
+;;; Name
+;;; meter
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in meters.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit meter number)
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/dmeter
+;;; Name
+;;; dmeter
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in deci-meters.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit dmeter number
+	   :base-unit meter
+	   :conversion-to-base (/ value 10)
+	   :conversion-from-base (* value 10))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/cmeter
+;;; Name
+;;; cmeter
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in centi-meters.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit cmeter number
+	   :base-unit meter
+	   :conversion-to-base (/ value 100)
+	   :conversion-from-base (* value 100))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/mmeter
+;;; Name
+;;; mmeter
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in milli-meters.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit mmeter number
+	   :base-unit meter
+	   :conversion-to-base (/ value 1000)
+	   :conversion-from-base (* value 1000))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/yard
+;;; Name
+;;; yard
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in yards.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit yard number
+	   :base-unit meter
+	   :conversion-to-base (* value 0.9144)
+	   :conversion-from-base (/ value 0.9144))
+;;; ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****U* unit/inch
+;;; Name
+;;; inch
+;;;
+;;; File
+;;; unit.lsp
+;;;
+;;; Description
+;;; Numeric unit representing a distance in inches.
+;;;
+;;; Last Modified
+;;; 2021/01/29
+;;;
+;;; Synopsis
+(make-unit inch number
+	   :base-unit meter
+	   :conversion-to-base (* value 0.0254)
+	   :conversion-from-base (/ value 0.0254))
 ;;; ****
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

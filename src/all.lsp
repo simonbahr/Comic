@@ -520,8 +520,12 @@
  "superhero.lsp")
 
 ;;; LOAD I/O Functionality
-(cc-load-files "read.lsp"
-	       "write.lsp")
+(cc-load-compile-files
+ ;; third-party midi-lib, included in comic-source
+ "midi.lsp")
+(cc-load-files
+ "read.lsp"
+ "write.lsp")
 
 ;;; LOAD MODULE: RENDER
 (cc-load-files
@@ -685,10 +689,6 @@
 ;;; Synopsis
 (defun cc-soft-reload ()
 ;;; ****
-  ;; initial call to the macro when loading comic:
-
-  (when (find-package :cm)
-    (cc-load-files "midi.lsp"))
   
 ;;; LOAD REST 0F MODULE: MAIN
   ;; units must be loaded here, as 
