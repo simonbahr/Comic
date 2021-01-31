@@ -471,8 +471,8 @@
 ;;; Synopsis
 (defun run (software-name &rest args)
 ;;; ****
-  (when-verbose "~&Calling external program ~a~%" software-name)
-  (funcall (cadr (cc-get :external-program-call))
+  (when-verbose "~&Calling external program ~a (~a)~%" software-name args)
+  (funcall (cc-get :external-program-call)
 	   (if (member software-name (flat (cc-get :external-software)))
 	       (cc-get :external-software software-name)
 	       software-name)
@@ -481,9 +481,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun run-and-return-output (software-name &rest args)
 ;;; ****
-  (when-verbose "~&Calling external program ~a~%" software-name)
+  (when-verbose "~&Calling external program ~a (~a)~%" software-name args)
   (with-output-to-string (out)
-    (funcall (cadr (cc-get :external-program-call))
+    (funcall (cc-get :external-program-call)
 	     (if (member software-name (flat (cc-get :external-software)))
 		 (cc-get :external-software software-name)
 		 software-name)

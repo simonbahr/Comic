@@ -1001,6 +1001,7 @@
 ;;; ****
 	   :make-proc-body
 	   (progn
+	     ;; check if file exists and is a wav-file:
 	     (unless (probe-file value)
 	       (cc-error 'SOUNDFILE
 		   "The file ~a does not exist."
@@ -1013,13 +1014,13 @@
 	       (cc-error 'SOUNDFILE
 		   "File extension not recognised. ~
                         Please choose a .wav-file."))
+	     ;; set default values:
 	     (unless start-time
 	       (setq start-time (secs 0)))
-	     ;; #+clm
-	     ;; (unless duration
-	     ;;   (setq duration
-	     ;; 	     (u- (clm::sound-duration value)
-	     ;; 		 start-time)))
+	     (unless duration
+	       (setq duration
+		     (u- (secs (get-wav-file-data value))
+			 start-time)))
 	     ;; using Michaels get-spectrum function
 	     ;; to find the most prominent partial
 	     ;; at start-time of soundfile and use it

@@ -81,9 +81,6 @@
 ;;; - midivelocity -> amplitude-slot,
 ;;; - ...as well as start-time and duration.
 ;;;
-;;; N.B.: Requires common-music, as e.g. included in
-;;; slippery-chicken.
-;;;
 ;;; Arguments
 ;;; file
 ;;;
@@ -91,7 +88,7 @@
 ;;; A list of events
 ;;;
 ;;; Last Modified
-;;; 2020/04/20
+;;; 2021/01/31
 ;;;
 ;;; Synopsis
 (defun read-midi-file (file &key tracks)
@@ -181,3 +178,40 @@
 ;; 	    result)))
 ;;     (reverse result)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-u4 (stream &optional position)
+  "Reads a 4 byte little-endian integer from stream."
+  (when position (file-position stream position))
+  (let ((u4 0))
+    (setf (ldb (byte 8 0) u4) (read-byte stream))
+    (setf (ldb (byte 8 8) u4) (read-byte stream))
+    (setf (ldb (byte 8 16) u4) (read-byte stream))
+    (setf (ldb (byte 8 24) u4) (read-byte stream))
+    u4))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-u2 (stream &optional position)
+  "Reads a 2 byte little-endian integer from stream."
+  (when position (file-position stream position))
+  (let ((u2 0))
+    (setf (ldb (byte 8 0) u2) (read-byte stream))
+    (setf (ldb (byte 8 8) u2) (read-byte stream))
+    u2))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun get-wav-file-data (file)
+  "Returns three values: The duration (in secs), samplerate and number
+  of channels of a wav-file"
+  (with-open-file (f file
+		     :direction :input
+		     :element-type '(unsigned-byte 8))
+    (let* ((flen (file-length f))
+	   (srate (read-u4 f 24))
+	   (channels (read-u2 f 22))
+	   (bits-per-samp (read-u2 f 34))
+	   (sound-duration (/ flen
+			      (/
+			       (* srate channels
+				  bits-per-samp)
+			       8))))
+      (values (secs sound-duration) srate channels))))

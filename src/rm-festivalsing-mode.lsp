@@ -25,21 +25,19 @@
 ;;                      :-                                                        ;;
 ;; COMIC 1                                                                        ;;
 ;; Media-Integrative Composition in Common Lisp                        Simon Bahr ;;
-;; render-modes/rm-isis.lsp                                                  2020 ;;
+;; render-modes/rm-festivalsing-mode.lsp                                     2020 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (in-package :comic)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; ****R* render-mode/isis-mode
+;;; ****R* render-mode/festivalsing-mode
 ;;; Name
-;;; isis-mode
+;;; festivalsing-mode
 ;;;
 ;;; File
-;;; rm-isis-mode.lsp
+;;; rm-festivalsing-mode.lsp
 ;;;
 ;;; Description
-;;; A render-mode based on the IRCAMs ISiS (IRCAM Singing Synthesis).
-;;; https://isis-documentation.readthedocs.io/en/latest/index.html
 ;;;
 ;;; Output Format
 ;;; :sound
@@ -51,78 +49,63 @@
 ;;; amplitude, location
 ;;;
 ;;; Options
-;;; voice: EL, MS or RT (in progress!)
+;;; voice: en1_mbrola, us1_mbrola, us2_mbrola,
+;;;        cmu_us_clb_arctic_clunits, hy_fi_mv_diphone,
+;;;        cmu_us_slt_arctic_hts, suo_fi_lj_diphone
 ;;;
 ;;; Dependencies
-;;; :clm, isis
+;;; :clm, festival/text2wave
 ;;;
 ;;; Last Modified
 ;;; 2020/01/30
 ;;;
 ;;; Synopsis
 #+clm
-(make-render-mode isis-mode :sound
+(make-render-mode festivalsing-mode :sound
 		  :required-slots
 		  (duration start-time text pitch)
 		  :optional-slots
-		  (amplitude location)
-		  :options
-		  (;; (voice "EL")
-		   )
+		  (location amplitude)
+		  ;; :options
+		  ;; ((voice "en1_mbrola"))
 		  :required-packages (:clm)
-		  :required-software (isis)
-		  :group-events t
+		  :required-software (festival/text2wave)
 ;;; ****
-		  ;; because of the weired file structure of isis,
-		  ;; everything must be done in :header-code
-		  :before-code
-		  (loop for e in (flat events) do
-		       (let ((wav-file (make-tmp-file nil "wav"))
-			     ;; WRITING FILE:
-			     (isis-file
-			      (make-tmp-file 
-			       (with-output-to-string (file)
-				 (let ((text-ls
-					(loop for e in (flat event) collect
-					     (text e)))
-				       (midi-ls
-					(loop for e in (flat event) collect
-					     (%-> (pitch e) 0 127 'midinote)))
-				       (duration-ls
-					(loop for e in (flat event) collect
-					     (%-> (duration e) .001 1000 'secs))))
-				   (format file "[lyrics]~%xsampa: ")
-				   (loop for elem in text-ls do
-					(format file "~a " (value (xsampa elem))))
-				   (format file "~%~%[score]~%midiNotes: ")
-				   (format file "~{~a~^, ~}~%~%" midi-ls)
-				   (format file "globalTransposition: 0~%~%")
-				   (format file "rhythm: ") 
-				   (format file "~{~a~^, ~}~%~%" duration-ls)
-				   (format
-				    file
-				    "defaultSentenceLoudness: 0.2~%~%tempo: 60~%"))))))
-			 ;; RUNNING ISIS
-			 (run 'isis
-			      "-m" isis-file
-			      "-o" wav-file
-			      ;; "-sv" voice
-			      )
-			 ;; Check if it worked
-			 (if (probe-file wav-file)
-			     (push (list (value e 'secs 'start-time)
-					 (if (amplitude e)
-					     (value e 'amp 'amplitude)
-					     1)
-					 (clm-get-amp-scalers
-					  e protagonist)
-					 wav-file)
-				   tmp1)
-			     (format
-			      t
-			      "~&ISIS-MODE: Rendering of event~
-                                  with ID ~d failed."
-			      (id e)))))
+		  :event-code
+		  (let ((xml-file-name (make-tmp-file nil "xml"))
+			(wav-file (make-tmp-file nil "wav")))
+		    (with-open-file (xml-file xml-file-name
+					      :direction :output)
+		      ;; Write xml-data:
+		      (format xml-file "<?xml version=\"1.0\"?> ~
+<!DOCTYPE SINGING PUBLIC \"-//SINGING//DTD SINGING mark up//EN\" ~
+\"Singing.v0_1.dtd\" []> 
+<SINGING BPM='60'>~%
+<PITCH FREQ='~a'><DURATION ~
+SECONDS='~a'>~a</DURATION></PITCH>
+</SINGING>"
+			      (round (value pitch 'hz))
+			      (value duration 'secs)
+			      (value text)))
+		    ;; RUNNING FESTIVAL
+		    (run 'festival/text2wave
+			 "-mode" "singing" ;; "-scale" "1"
+			 xml-file-name
+			 "-o" wav-file)
+		    ;; Check if it worked
+		    (if (probe-file wav-file)
+			(push (list (value start-time 'secs)
+				    (if amplitude
+					(value amplitude 'amp)
+					1)
+				    (clm-get-amp-scalers
+				     event protagonist)
+				    wav-file)
+			      tmp2)
+			(format
+			 t
+			 "~&FESTIVALSING-MODE: Rendering of event~
+                                  with ID ~a failed." id)))
 		  ;; MIXING FILES 
 		  :footer-code
 		  (let ((channels
@@ -131,10 +114,10 @@
 			(mix-file
 			  (tmp-path
 			   (format nil
-				   "~a_isis.wav"
+				   "~a_festivalsing.wav"
 				   (name protagonist)))))
 		    ;; mixing
-		    (when tmp1
+		    (when tmp2
 		      (eval
 		       `(clm::with-sound
 			    (:output
@@ -145,10 +128,10 @@
 			     :header-type clm::mus-riff
 			     :data-format clm::mus-lfloat)
 			  ;; add channels/spacial positioning
-			  ,@(loop for (st amp scalers file) in tmp1 collect
+			  ,@(loop for (st amp scalers file) in tmp2 collect
 				  `(clm::cc-samp5
 				    ,file
-				    ,(- st 1/10);rendered files will not start at 0
+				    ,st
 				    ,channels
 				    :amp-scalers ,scalers
 				    :amp ,amp))))

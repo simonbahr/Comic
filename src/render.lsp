@@ -554,7 +554,7 @@
 			     (when (type-or return-file '(string pathname))
 			       (cp-to-project-dir return-file))
 			     (format
-			      t "~&Render-mode ~a returned nil~
+			      t "~&Render-mode ~a returned nil. ~
                             Maybe the render process failed."
 			      m)))))))
     (format t "~&RENDER PROCESS FINISHED.~%~
