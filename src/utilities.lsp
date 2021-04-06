@@ -1,4 +1,4 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;c;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                                                    *=*:        ;;
 ;;                                         -   -  -  -              :===:         ;;
 ;;                                                                 *==:           ;;
@@ -188,6 +188,74 @@
 		      (cc-error 'average "list elements must be numeric")))))
 	(/ (sum list) (length list)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun median (list)
+  "Returns the median of a list of numbers"
+  (let* ((len (length list))
+	 (ls (copy-seq list)) ;make non-destructive!
+	 (nlst (sort ls #'>)))
+    (if (evenp len)
+        (/ (+ (nth (/ len 2) nlst)
+              (nth (- (/ len 2) 1) nlst))
+	   2)
+        (nth (truncate (/ len 2)) nlst))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun diversify-list (list)
+  "resort a list so that the steps between numbers are as high as
+   possible."
+  (if (< (length list) 2)
+      list
+      (let ((new-second (loop for elem in (cdr list)
+			      for n from 1
+			      for diff = (abs (- elem (car list)))
+			      with max-diff = 0
+			      with nth = 1
+			      when (> diff max-diff)
+				do (progn (setq max-diff diff)
+					  (setq nth n))
+			      finally (return nth))))
+	(cons (car list)
+	      (cons (nth new-second list)
+		    (diversify-list
+		     (append
+		      (subseq list 1 new-second)
+		      (subseq list (1+ new-second)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun pick-n (n list &key (force-unique t))
+  "Picks n numbers from a list of numbers that (a) should not exceed the
+   median 50% of the value range and (b) should be different as possible
+   within that range."
+  (if (>= n (length list))
+      ;; simplest case: not enough values at all:
+      list
+      ;; else, find the 50%-median-range:
+      (let* ((ls (copy-seq list))
+	     (median (median ls))
+	     (low-med (median
+		       (loop for num in ls
+			     when (<= num median)
+			       collect num)))
+	     (high-med (median
+			(loop for num in ls
+			      when (>= num median)
+				collect num)))
+	     (selection (loop for num in ls
+			      when (<= low-med num high-med)
+				collect num)))
+	(if (and force-unique (> n (length selection)))
+	    ;; if there are not enough numbers in 50% median range
+	    ;; and force-n is t, select by distance to median:
+	    (subseq
+	     (sort ls (lambda (e1 e2)
+			(when (< (abs (- e1 median))
+				 (abs (- e2 median)))
+			  t)))
+	     0 n)
+	    ;; else, select best matches by 
+	    (sort (set-length n (diversify-list selection)) #'<)))))
+	 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun all? (proc ls)
   "Returns t if the proc returns true for all elements in ls."
@@ -480,6 +548,8 @@
 (setf *print-circle* t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Seems to be inefficient! Running into debugger (heap exhausted)
+;; with large strings.
 (defun string-to-list (string &optional
 				(delimiter " ")
 				include-delimiter)
@@ -704,7 +774,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun next-power-of-2 (n) 
-    (expt 2 (ceiling (/ (log n) (log 2)))))
+  (expt 2 (ceiling (/ (log n) (log 2)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun save-subseq (sequence start &optional end)
+  "Subseq that will rather return nil than an error"
+  (let ((len (length sequence)))
+    (when (< start 0) (setq start 0))
+    (when (and end (< end 0)) (setq end 0))
+    (when (and end (> end len)) (setq end len))
+    (when (and end (> start end)) (setq start end))
+    (subseq sequence start end)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; EOF utilities.lisp

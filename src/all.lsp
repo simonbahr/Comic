@@ -146,8 +146,8 @@
 		     (location number list)
 		     (expansion number list)
 		     (text string unit)
-		     (soundfile soundfile)
-		     (videofile videofile)
+		     (soundfile soundfile string)
+		     (videofile videofile string)
 		     (events event list)))
     ;; name of current comic during render:
     (:current-project-name . nil)
@@ -490,51 +490,6 @@
                                 could not be found.")))
   t)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun cc-load-files (&rest filenames)
-  (loop for filename in filenames do
-    (load (merge-pathnames filename (cc-get :src-dir))))
-  t)
-
-(defun cc-load-compile-files (&rest filenames)
-  (loop for filename in filenames do
-       (load (compile-file (merge-pathnames filename (cc-get :src-dir)))))
-  t)
-
-(defun cc-load-files-if (condition &rest filenames)
-  (when condition (apply #'cc-load-files filenames)))
-
-;;; LOAD MODULES: MAIN / UTILITIES
-(cc-load-files "utilities.lsp"
-	       "classes.lsp"
-	       "placed-object.lsp"
-	       "envelopes.lsp"); functions for creating lists of numbers
-
-;;; LOAD MODULE: EVENT
-(cc-load-files
- "event.lsp"; event/comic classes and methods
- "comic.lsp"
- "event-generate.lsp"
- "event-transform.lsp"
- "superhero.lsp")
-
-;;; LOAD I/O Functionality
-(cc-load-compile-files
- ;; third-party midi-lib, included in comic-source
- "midi.lsp")
-(cc-load-files
- "read.lsp"
- "write.lsp")
-
-;;; LOAD MODULE: RENDER
-(cc-load-files
- "prepare-render.lsp"
- "protagonist.lsp"
- "render-mode.lsp"
- "render.lsp"; the render-module
- "analyse.lsp"); the analysis-module for auto-creation of comics
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****f* main/add-software-path
 ;;; Name
@@ -579,6 +534,7 @@
 (defun add-software-path (name path)
 ;;; ****
   (when (probe-file path)
+    ;; set in external-software
     (let* ((ext (cc-get :external-software)))
       (if (assoc name ext)
 	  (progn
@@ -586,6 +542,15 @@
 	    (cc-set :external-software ext))
 	  (cc-set :external-software
 		  (cons (cons name path) ext))))
+    ;; set in preferences:
+    (let ((ext (cc-get :preferences :software-paths)))
+      (if (assoc name ext)
+	  (progn
+	    (rplacd (assoc name ext) path)
+	    (cc-change-preferences :software-paths ext))
+	  (cc-change-preferences
+	   :software-paths
+	   (cons (cons name path) ext))))
     (push (make-keyword name) *features*)
     t))
 
@@ -607,7 +572,7 @@
 		(load-and-return pref-file))
 	(format t "~&Comic user-preferences file not found.~%"))
     ;; update all:
-    (when (cc-get :preferences) ;makes sure the file was not empty
+    (when (and (cc-get :preferences) exists?) ;makes sure the file was not empty
       ;; add software-paths
       (loop for p in (cc-get :preferences :software-paths)
 	    do (add-software-path (car p) (cdr p)))
@@ -625,8 +590,8 @@
 (defun cc-change-preferences (&key
 				(render-mode-files nil rmp)
 				(software-paths nil spp)
-				(output-directory nil odp)
-				(tmp-directory nil tdp)
+				(output-dir nil odp)
+				(tmp-dir nil tdp)
 				(external-program-call nil epcp))
   ;; use set values if no new value is supplied
   (unless rmp
@@ -634,9 +599,9 @@
   (unless spp
     (setq software-paths (cc-get :preferences :software-paths)))
   (unless odp
-    (setq output-directory (cc-get :preferences :output-directory)))
+    (setq output-dir (cc-get :preferences :output-dir)))
   (unless tdp
-    (setq tmp-directory (cc-get :preferences :tmp-directory)))
+    (setq tmp-dir (cc-get :preferences :tmp-dir)))
   (unless epcp
     (setq external-program-call
 	  (cc-get :preferences :external-program-call)))
@@ -645,14 +610,39 @@
 	  (list 
 	   (cons :render-mode-files render-mode-files) 
 	   (cons :software-paths software-paths)
-	   (cons :output-directory output-directory) 
-	   (cons :tmp-directory tmp-directory) 
+	   (cons :output-dir output-dir) 
+	   (cons :tmp-dir tmp-dir)
 	   (cons :external-program-call 'SB-EXT:RUN-PROGRAM)))
   ;; save preferences to file user-preference.lisp
-  (cc-save-preferences)
-  ;; load the preferce-file back in to apply changes
-  (cc-load-preferences))
+  (cc-save-preferences))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun cc-load-files (&rest filenames)
+  (loop for filename in filenames do
+    (load (merge-pathnames filename (cc-get :src-dir))))
+  t)
+
+(defun cc-load-compile-files (&rest filenames)
+  (loop for filename in filenames do
+       (load (compile-file (merge-pathnames filename (cc-get :src-dir)))))
+  t)
+
+(defun cc-load-files-if (condition &rest filenames)
+  (when condition (apply #'cc-load-files filenames)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun editor (&optional comic)
+  (unless (member :comic-gui-editor *features*)
+    ;; try to load mcclim via quicklisp if it is not there:
+    (unless (find-package :clim)
+      (when (find-package :quicklisp)
+	(ql:quickload :mcclim)))
+    ;; load the gui file if we have mcclim it now:
+    (when (find-package :clim)
+      (cc-load-files "gui.lsp")))
+  ;; ... if it is possible, start the editor
+  (when (find-package :clim)
+    (cc-start-gui-editor comic)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****f* main/load-comic
@@ -689,43 +679,64 @@
 ;;; Synopsis
 (defun cc-soft-reload ()
 ;;; ****
-  
+  ;;load preferences
+  (cc-load-preferences)
 ;;; LOAD REST 0F MODULE: MAIN
-  ;; units must be loaded here, as 
   (cc-load-files "unit.lsp"); loads "unit-functions.lisp"
   (when (find-package :clm)
     (cc-load-compile-files "clm-mix.lsp"
 			   "clm-ins.lsp"))
-
   ;; load mcclim for gui-editor
   (when (find-package :clim)
     (cc-load-files "gui.lsp"))
-
   ;; add some fun!
   (cc-load-files "fun.lsp")
-
-  ;;load preferences
-  (cc-load-preferences)
-  
 ;;; after load will print out status information: 
   (cc-load-files "after-load.lsp"))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; LOAD MODULES: MAIN / UTILITIES
+(cc-load-files
+ "utilities.lsp"
+ "classes.lsp"
+ "placed-object.lsp"
+ "envelopes.lsp"); functions for creating lists of numbers
+
+;;; LOAD Read-Functionality
+(cc-load-compile-files
+ ;; third-party midi-lib, included in comic-source
+ "midi.lsp")
+(cc-load-files
+ "read.lsp"
+ "write.lsp")
+
+;;; LOAD MODULE: EVENT/COMIC
+(cc-load-files
+ "event.lsp"; event/comic classes and methods
+ "comic.lsp"
+ "event-generate.lsp"
+ "event-transform.lsp"
+ "superhero.lsp")
+
+;;; LOAD MODULE: RENDER
+(cc-load-files
+ "prepare-render.lsp"
+ "make-notation-data.lsp"
+ "protagonist.lsp"
+ "render-mode.lsp"
+ "render.lsp"; the render-module
+ "analyse.lsp"); the analysis-module for auto-creation of comics
+
+(cc-load-preferences)
+;; any code that is e.g. evaluated depending on software-paths in
+;; preferences must not be included before loading preferences!
+
+;;; ADD TO MODULE: EVENT/COMIC
+(cc-load-files
+ "event-read.lsp")
+
 (cc-soft-reload)
-
-(defun editor (&optional comic)
-  (unless (member :comic-gui-editor *features*)
-    ;; try to load mcclim via quicklisp if it is not there:
-    (unless (find-package :clim)
-      (when (find-package :quicklisp)
-	(ql:quickload :mcclim)))
-    ;; load the gui file if we have mcclim it now:
-    (when (find-package :clim)
-      (cc-load-files "gui.lsp")))
-  ;; ... if it is possible, start the editor
-  (when (find-package :clim)
-    (cc-start-gui-editor comic)))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; EOF comic/all.lisp

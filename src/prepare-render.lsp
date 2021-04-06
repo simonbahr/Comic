@@ -481,6 +481,60 @@
     (check-times comic)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun get-tempo-deviation (bpm events
+			    &key
+			      (metric-layers 4)
+			      (time-position 0))
+  "Returns a deviation-factor for a list of events and a grid of beats
+   at a given tempo. If all times are on the beat, deviation is 0"
+  ;; calculate a single time-values deviation from metric grid:
+  (labels ((get-dev (val bpm c)
+	     (multiple-value-bind (beat dev)
+		 (round (/ val (/ 1 (/ bpm 60))))
+	       (declare (ignore beat))
+	       (let ((the-dev (abs dev)))
+		 (if (> c 0)
+		     (+ the-dev
+			(get-dev the-dev (* 2 bpm) (1- c)))
+		     0)))))
+    (let ((times
+	    ;; all start- and end-times of events in seconds:
+	    (loop for e in events
+		  append
+		  (let* ((st (value e 'secs 'start-time))
+			 (dur (value e 'secs 'duration)))
+		    (list (- st time-position)
+			  (- (+ st dur) time-position))))))
+      (loop for time in times
+	    summing
+	    (get-dev time bpm metric-layers)
+	      into result
+	    finally (return (/ result (length times)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun find-tempo (events
+		   &key
+		     (metric-layers 4)
+		     (time-position 0)
+		     print)
+  "Detect a good tempo for events in bpm. Return success-factor (0-1)
+   as second value."
+  (apply
+   #'values
+   (car
+    (sort 
+     (loop for tempo from 60 to 120
+	   collect
+	   (let ((dev (get-tempo-deviation
+		       tempo events
+		       :metric-layers metric-layers
+		       :time-position time-position)))
+	     (when print
+	       (format t "~&~a (~a)" tempo (float dev)))
+	     (list tempo dev)))
+     #'< :key #'second))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-flatten-events (comic)
   "Flattens the event list of a comic. All parents should only have
    values for duration and start-time: Run auto-completion first!"

@@ -589,4 +589,18 @@
 ;; NUMBERS SHOULD ALL BE FILLED BY CC-AUTOSET-NUMERIC-VALUES
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod to-code ((object comic))
+  (let* ((slots (get-slots object)))
+    (format nil "(make-comic '~a ~{ ~a~})~%"
+	    (name object)
+	    (loop
+	      for slot in slots
+	      for val = (slot-value object slot)
+	      unless (or (eq slot 'name) (not val))
+		collect
+		(format nil ":~a ~a"
+			slot
+			(to-code val))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; EOF comic/comic.lsp

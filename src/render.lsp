@@ -114,6 +114,22 @@
       (render-modes event modes))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun cc-make-notation-data (events)
+  "if at least one render-mode needs notation data, generate it and 
+   save it in cc-render-data"
+  (let ((make? nil))
+    (doevents (e events)
+      (loop for m in (flat (render-modes e)) do
+	(when (slot-value m 'make-notation-data)
+	  (setq make? t))))
+    (when make?
+      (multiple-value-bind (bar-list tempo-map timesig-map)
+	  (make-cc-bar-list events)
+	(cc-set-render-data 'cc-bars bar-list)
+	(cc-set-render-data 'tempo-map tempo-map)
+	(cc-set-render-data 'timesig-map timesig-map)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun cc-group-events (events)
   "grouping events that follow each other directly in time 
    into sublists --> (= st1 (+ st2 dur1))"
@@ -226,7 +242,7 @@
 	  (events the-obj (cons event (events the-obj)))
 	  t)
 	;; warn if no protagonist was found
-	(when print
+	(when (and print (not (zerop (id event))))
 	  (format
 	   t "~&WARNING: No protagonist found for event with id ~d"
 	   (id event))))))
@@ -448,10 +464,14 @@
     (when (or print (when-verbose))
       (format t "~&Pre-selecting render-modes..."))
     (cc-pre-select-render-modes obj)
+    ;; if at least one remaining render-mode needs notation-data,
+    ;; we will generate it. Otherwise we skip that to save time:
+    (when (or print (when-verbose))
+      (format t "~&Making notation data..."))
+    (cc-make-notation-data obj)
     ;; the render-process:
     ;; either with or without protagonists!
     (if protagonists
-	;;
 	;;
 	;; WITH PROTAGONISTS:
 	;;
@@ -582,5 +602,3 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EOF render.lsp
-
-

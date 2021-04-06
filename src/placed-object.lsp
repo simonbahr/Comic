@@ -150,18 +150,16 @@
 (defmethod set-dimensions ((obj placed-object) dimensions)
   (let ((loc (location obj))
 	(expan (expansion obj)))
-    (when loc
       (location
        obj
        (set-length dimensions
 		   (append (flat loc)
-			   (set-length dimensions 0)))))
-    (when expan
+			   (set-length dimensions 0))))
       (expansion
        obj
        (set-length dimensions
 		   (append (flat expan)
-			   (set-length dimensions 0)))))))
+			   (set-length dimensions 0))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****m* placed-object/get-distance
@@ -201,43 +199,48 @@
   (loop for val1 in pt1
      for val2 in pt2
      summing (expt (- val1 val2) 2) into result
-     finally (return (sqrt result))))
+	finally (return (sqrt result))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod get-distance ((obj1 placed-object)
 			 (obj2 placed-object))
   "Returns the closest distance between two placed objects."
-  (let* ((loc1 (location obj1))
-	 (loc2 (location obj2))
-	 (exp1 (expansion obj1))
-	 (exp2 (expansion obj2))
-	 ;; coordinates of centers of objects:
-	 (cen1 (mapcar (lambda (l e) (+ l (/ e 2))) loc1 exp1))
-	 (cen2 (mapcar (lambda (l e) (+ l (/ e 2))) loc2 exp2)))
-    (loop for l1 in loc1
-       for l2 in loc2
-       for e1 in exp1
-       for e2 in exp2
-       summing (let (;; the distance between the closest
-		     ;; points on outer shell of both objects
-		     (result (if (< l1 l2)
-				 ;; (- (+ l1 (* .5 e1)) (- l2 (* .5 e2)))
-				 ;; (- (+ l2 (* .5 e2)) (- l1 (* .5 e1)))))
-				 (- (+ l1 e1) l2)
-				 (- (+ l2 e2) l1 )))
+  (let ((dimensions (max (get-dimensions obj1)
+			 (get-dimensions obj2))))
+    (set-dimensions obj1 dimensions)
+    (set-dimensions obj2 dimensions)
+    (let* ((loc1 (location obj1))
+	   (loc2 (location obj2))
+	   (exp1 (expansion obj1))
+	   (exp2 (expansion obj2))
+	   ;; coordinates of centers of objects:
+	   (cen1 (mapcar (lambda (l e) (+ l (/ e 2))) loc1 exp1))
+	   (cen2 (mapcar (lambda (l e) (+ l (/ e 2))) loc2 exp2)))
+      (loop for l1 in loc1
+	    for l2 in loc2
+	    for e1 in exp1
+	    for e2 in exp2
+	    summing (let (;; the distance between the closest
+			  ;; points on outer shell of both objects
+			  (result (if (< l1 l2)
+				      ;; (- (+ l1 (* .5 e1)) (- l2 (* .5 e2)))
+				      ;; (- (+ l2 (* .5 e2)) (- l1 (* .5 e1)))))
+				      (- (+ l1 e1) l2)
+				      (- (+ l2 e2) l1 )))
 
-		     ;; the distance between the centers of both
-		     ;; objects
-		     (center-dist (get-distance cen1 cen2)))
-		 ;; the outer distance must be less or equal the
-		 ;; distance between the centers. Otherwise, we
-		 ;; have a "negative distance", meaning the objects
-		 ;; overlap. In that case, the distance is 0.
-		 (if (>= result center-dist)
-		     (return 0)
-		     ;; basic pythagoras:
-		     (expt result 2)))
-       into result
-       finally (return (sqrt result)))))
+			  ;; the distance between the centers of both
+			  ;; objects
+			  (center-dist (get-distance cen1 cen2)))
+		      ;; the outer distance must be less or equal the
+		      ;; distance between the centers. Otherwise, we
+		      ;; have a "negative distance", meaning the objects
+		      ;; overlap. In that case, the distance is 0.
+		      (if (>= result center-dist)
+			  (return 0)
+			  ;; basic pythagoras:
+			  (expt result 2)))
+	      into result
+	    finally (return (sqrt result))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****m* placed-object/get-location-on-surface

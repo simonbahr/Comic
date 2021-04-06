@@ -546,42 +546,21 @@
 
 (defmethod to-code ((object symbol))
   (let ((cc-pkg (find-package :comic))
+	(key-pkg (find-package :keyword))
 	(sym-pkg (symbol-package object)))
-    (if (eq cc-pkg sym-pkg)
-	(format nil "'~a" object)
-	(format nil "'~a:~a" (package-name sym-pkg) object))))
+    (cond ((eq cc-pkg sym-pkg)
+	   (format nil "'~a" object))
+	  ((eq key-pkg sym-pkg)
+	   (format nil ":~a" object))
+	  (t
+	   (format nil "'~a:~a" (package-name sym-pkg) object)))))
     
 (defmethod to-code ((object string))
   (format nil "\"~a\"" object))
 
-
-;; and for frequently used comic-stuff:
-(defmethod to-code ((object comic))
-  (let* ((slots (get-slots object)))
-    (format nil "(make-comic '~a ~{ ~a~})~%"
-	    (name object)
-	    (loop
-	      for slot in slots
-	      for val = (slot-value object slot)
-	      unless (or (eq slot 'name) (not val))
-		collect
-		(format nil ":~a ~a"
-			slot
-			(to-code val))))))
-
-(defmethod to-code ((object event))
-  (let* ((slots (get-slots object)))
-    (format nil "(make-event ~{ ~a~})~%"
-	    (loop
-	      for slot in slots
-	      for val = (slot-value object slot)
-	      when val
-		collect
-		(format nil ":~a ~a"
-			slot
-			(to-code val))))))
-
 (defmethod to-code ((object null)) "NIL")
+
+;; (to-code methods for comics and events moved to the respective files.)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric save (object file &key overwrite))

@@ -446,6 +446,20 @@
 	   (clone e))
       ls))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod to-code ((object event))
+  (let* ((slots (get-slots object)))
+    (format nil "(make-event ~{ ~a~})~%"
+	    (loop
+	      for slot in slots
+	      for val = (slot-value object slot)
+	      when val
+		collect
+		(format nil ":~a ~a"
+			slot
+			(to-code val))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric add-events (event events &optional id))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****m* event/add-events

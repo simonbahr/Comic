@@ -734,9 +734,10 @@ works only if the chars are coded in ASCII]"
 
 (define-midi-message time-signature-message (meta-message tempo-map-message)
   :data-min #x58 :data-max #x58
-  :slots ((nn :reader message-numerator) 
-	  (dd :reader message-denominator) 
-	  (cc) (bb))
+  :slots ((nn :initarg :nn :reader message-numerator) 
+	  (dd :initarg :dd :reader message-denominator) 
+	  (cc :initarg :cc :initform 24)
+	  (bb :initarg :bb :initform 8))
   :filler (progn next-byte (setf nn next-byte dd next-byte
 				 cc next-byte bb next-byte))
   :length 4
@@ -805,6 +806,8 @@ works only if the chars are coded in ASCII]"
 (defmethod get-microseconds-per-beat ((msg tempo-message))
   (slot-value msg 'tempo))
 
+(defun bpm->microtempo (bpm)
+  (round (/ 60000000 bpm)))
 
 (defun get-time-in-microseconds (midi-time
 				 microseconds-per-beat
@@ -826,12 +829,87 @@ works only if the chars are coded in ASCII]"
       divisions)
      1000000))
 
+;; (defun get-midi-time (time-in-secs divisions
+;; 		      &optional (microseconds-per-beat 500000))
+;;   (round
+;;    (/ (* (* time-in-secs 1000000)
+;; 	 divisions)
+;;       microseconds-per-beat)))
+
 (defun get-midi-time (time-in-secs divisions
-		      &optional (microseconds-per-beat 500000))
-  (round
-   (/ (* (* time-in-secs 1000000)
-	 divisions)
-      microseconds-per-beat)))
+		      &optional (bpm 60))
+  (/ (* (* time-in-secs 1000000)
+	divisions)
+     (/ 60000000 bpm)))
+
+;; BUGGY! Times in midi output deviate, e.g. up to one minute at one
+;; hour in midifile. Maybe make more precise someday...
+;; Good news is: When working with midi only, all files will have
+;; equal deviation.
+(defun get-midi-time-by-tempo-map
+    (secs divisions &optional (tempo-map '((60 0))))
+  (let ((current-secs 0)
+	(current-time 0))
+    (loop for (tempo temposecs) in tempo-map
+	  with tempo-until = (caar tempo-map)
+	  unless (< secs temposecs)
+	    do
+	       (incf current-time
+		     (get-midi-time (abs (- temposecs current-secs))
+				    divisions tempo-until))
+	       (setf current-secs temposecs)
+	       (setf tempo-until tempo)
+	  finally
+	     (incf current-time
+	  	   (get-midi-time (abs (- secs current-secs))
+	  			  divisions tempo)))
+    current-time))
+
+
+;; (defun get-midi-time-by-tempo-map
+;;     (secs division &optional (tempo-map '((60 0))))
+;;   (let ((current-time 0))
+;;     (labels ((helper (tempo-map)
+;; 	       (let ((tempo (first (first tempo-map)))
+;; 		     (tempo-from (second (first tempo-map)))
+;; 		     (tempo-to (second (second tempo-map))))
+;; 		 (if (or (not tempo-to) (> tempo-to secs tempo-from))
+;; 		     ;; final tempo before secs:
+;; 		     (incf current-time
+;; 			   (get-midi-time
+;; 			    (abs (- secs tempo-from))
+;; 			    division tempo))
+;; 		     (progn
+;; 		       (incf current-time
+;; 			     (get-midi-time
+;; 			      (abs (- tempo-to tempo-from))
+;; 			      division tempo))
+;; 		       (when (cdr tempo-map)
+;; 			 (helper (cdr tempo-map))))))))
+;;       (helper tempo-map)
+;;       current-time)))
+
+;; (defun get-midi-time-by-cc-bars (secs division cc-bars)
+;;   (let ((time 0)
+;; 	(midi-time 0))
+;;     (loop for bar in cc-bars
+;; 	  do
+;; 	     (let* ((tempo (slot-value bar 'tempo))
+;; 		    (beats (slot-value bar 'beats))
+;; 		    (bar-dur (* beats (/ 60 tempo))))
+;; 	       (if (< time secs (+ bar-dur time))
+;; 		   (return (+ midi-time
+;; 			      (get-midi-time
+;; 			       (abs (- secs time))
+;; 			       division tempo)))
+;; 		   (progn
+;; 		     (incf time bar-dur)
+;; 		     (incf midi-time
+;; 			   (get-midi-time
+;; 			    bar-dur division tempo))))))))
+	       
+
+
 
 (defun is-note-off (msg)
   "T if msg is either note-off-message or note-on-massage with

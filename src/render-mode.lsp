@@ -126,6 +126,10 @@
    ;;    (start-time next-event))
    (group-events
     :initarg :group-events
+    :initform nil)
+   ;; does the render-mode need information on tempo/bar-structure?
+   (make-notation-data
+    :initarg :make-notation-data
     :initform nil)))
 ;;; ****
 
@@ -177,6 +181,10 @@
 ;;; (tmp variables will be nil but can be used to store any data),
 ;;; return-file-path (must be set somewhere along the way in order
 ;;; to return a file and add to to the mix of the protagonist)
+;;;
+;;; Accessible if make-notation-data is t:
+;;; bar-list (cc-bar-objects) , tempo-map (lists with tempo
+;;; and time-in-secs), timesig-map (ls with timesig time-in-secs)
 ;;;
 ;;; Accessible in before-, event- and after-code only:
 ;;; event, id (of current event)
@@ -255,7 +263,8 @@
 			      event-code
 			      after-code
 			      footer-code
-			      (group-events nil))
+			      group-events
+			      make-notation-data)
 ;;; ****
   ;; CHECK FOR PROP-NAMES
   (loop for prop in (flat required-slots)
@@ -300,7 +309,8 @@
 			  :event-code event-code
 			  :after-code after-code
 			  :footer-code footer-code
-			  :group-events group-events))
+			  :group-events group-events
+			  :make-notation-data make-notation-data))
 	 (method
 	   `(defmethod render-events (events (render-mode (eql ,instance))
 				      &optional protagonist print)
@@ -317,6 +327,9 @@
 			(date (cc-get-render-data 'date))
 			(output-dir (cc-get-render-data 'output-dir))
 			(project-name (name comic))
+			(bar-list (cc-get-render-data 'cc-bars))
+			(tempo-map (cc-get-render-data 'tempo-map))
+			(timesig-map (cc-get-render-data 'timesig-map))
 			(ids (mapcar #'id events))
 			(tmp1) (tmp2) (tmp3) (tmp4) (tmp5)
 			(return-file-path))
@@ -327,8 +340,9 @@
 				  `(second
 				    (nth ,n (slot-value ,instance 'options))))))
 		(declare (ignorable comic title subtitle author date
-				    project-name output-dir ids tmp1
-				    tmp2 tmp3 tmp4 tmp5))
+				    project-name output-dir ids
+				    bar-list tempo-map timesig-map
+				    tmp1 tmp2 tmp3 tmp4 tmp5))
 		(when events
 		  ;; run header-code
 		  ,header-code
@@ -370,7 +384,13 @@
 		;; return the return-file-path. It is up to the mode if it is set or
 		;; remains nil. It can also be set to t to indicate that something
 		;; happend, but not return a path to the protagonist.
-		return-file-path))))
+		(if (probe-file return-file-path)
+		    ;; if a file was created, give it a clear name: protagonist_render-mode
+		    (rename-file return-file-path
+				 (format nil "~(~a~)_~(~a~)"
+					 (name protagonist)
+					 (name render-mode)))
+		    return-file-path)))))
     ;; add render-mode-name to +cc-data+
     (cc-set :render-modes
 	    (acons name instance

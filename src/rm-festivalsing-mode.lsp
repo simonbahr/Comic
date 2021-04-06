@@ -38,6 +38,9 @@
 ;;; rm-festivalsing-mode.lsp
 ;;;
 ;;; Description
+;;; A text-to-voice render-mode, using festivals singing-mode,
+;;; executed by the subprogram text2wave. For more info on festival
+;;; visit http://festvox.org/
 ;;;
 ;;; Output Format
 ;;; :sound
@@ -47,11 +50,6 @@
 ;;;
 ;;; Optional Slots
 ;;; amplitude, location
-;;;
-;;; Options
-;;; voice: en1_mbrola, us1_mbrola, us2_mbrola,
-;;;        cmu_us_clb_arctic_clunits, hy_fi_mv_diphone,
-;;;        cmu_us_slt_arctic_hts, suo_fi_lj_diphone
 ;;;
 ;;; Dependencies
 ;;; :clm, festival/text2wave
