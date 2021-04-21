@@ -417,7 +417,78 @@
       (setf (slot-value e event-slot) match)))
   events)
 
-;;(defun subdivide-event (event) --> Ein event mit x subevents füllen, die es im render ersetzen (ntolen quasi)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****f* event/inverse-values-in-slot
+;;; Name
+;;; inverse-values-in-slot
+;;;
+;;; File
+;;; event-transform.lsp
+;;;
+;;; Description
+;;; Inverses all numeric values in a given slot for a list of events
+;;; (recursively!). The range for the inversion will be min->max the
+;;; given value range.
+;;;
+;;; Arguments
+;;; slot-name: A legal name for a slot of the event-class (symbol)
+;;; events: (list or single event with subevents or comic)
+;;;
+;;; Return Value
+;;; events
+;;;
+;;; Example
+#|
+(inverse-values-in-slot 'start-time
+   (#<EVENT, PITCH: 100, START-TIME: #<0.0 SECS (0.0 MSECS)>>
+    #<EVENT, PITCH: 150, START-TIME: #<2.0 SECS>>
+    #<EVENT, PITCH: 200, START-TIME: #<4.0 SECS>>))
+--> start-time
+(#<EVENT, PITCH: 100, START-TIME: #<4.0 SECS>>
+ #<EVENT, PITCH: 150, START-TIME: #<2.0 SECS>>
+ #<EVENT, PITCH: 200, TART-TIME: #<0.0 SECS (0.0 MSECS)>>)
+|#
+;;;
+;;; Last Modified
+;;; 2021/04/20
+;;; 
+;;; Synopsis
+(defun inverse-values-in-slot (slot-name events)
+;;; ****
+  ;; find first unit:
+  (let ((unit))
+    (doevents (e events)
+      (when (unit-p (funcall slot-name e))
+	(setq unit (type-of (funcall slot-name e)))
+	(return)))
+    ;; find minimum and maximum slot value:
+    (let ((min) (max))
+      (doevents (e events)
+	(let ((val (value e unit slot-name)))
+	  (when (numberp val)
+	    (when (or (not min) (< val min))
+	      (setq min val))
+	    (when (or (not max) (> val max))
+	      (setq max val)))))
+      ;; function can only work if min and max are set now
+      (if (and min max)
+	  ;; inverse values:
+	  (doevents (e events)
+	    (let ((val (value e unit slot-name)))
+	      (when (numberp val)
+		(funcall slot-name e
+			 (funcall unit (- max (- val min)))))))
+	  ;; if no inversion possible, print a warining:
+	  (cc-warn 'inverse-values-in-slot
+		   "Could not inverse values in ~a events ~%~
+                  for slot ~a: No min and/or max values found."
+		   (count-events events) slot-name))))
+  events)
+
+	    
+
+;;(defun subdivide-event (event)
+;;--> Ein event mit x subevents füllen, die es im render ersetzen (ntolen quasi)
 
 ;; (defun multiply-events
 

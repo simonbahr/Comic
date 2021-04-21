@@ -337,15 +337,22 @@
 	   (cond ((null value)
 		  nil)
 		 ((typep value (quote ,value-type))
+		  ;;
+		  ;; !!!
+		  ;; min and max values were checked here.
+		  ;; Problem: in calculations, values may be out of
+		  ;; bounds but ok for render.
+		  ;; TODO: -> ADD MIN-MAX Value Check before render!!!
+		  ;;
 		  ;; check for 
-		  ,(when max `(unless (<= value ,max)
-				(cc-error (quote ,name)
-				    "Value must not be greater than ~d"
-				  ,max)))
-		  ,(when min `(unless (>= value ,min)
-				(cc-error (quote ,name)
-				    "Value must not be smaller than ~d"
-				  ,min)))
+		  ;; ,(when max `(unless (<= value ,max)
+		  ;; 		(cc-error (quote ,name)
+		  ;; 		    "Value must not be greater than ~d"
+		  ;; 		  ,max)))
+		  ;; ,(when min `(unless (>= value ,min)
+		  ;; 		(cc-error (quote ,name)
+		  ;; 		    "Value must not be smaller than ~d"
+		  ;; 		  ,min)))
 		  ,(when make-proc-body make-proc-body)
 		  (make-instance ',name
 				 :value value

@@ -69,6 +69,39 @@
 	(apply #'make-event args)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****f* event/make-note
+;;; Name
+;;; make-note
+;;;
+;;; File
+;;; event-generate.lsp
+;;;
+;;; Description
+;;; Handy function for creating an event representing a musical note.
+;;;
+;;; Arguments (all optional)
+;;; start-time (default unit: secs)
+;;; duration (default unit: secs)
+;;; midinote (default unit: midinote)
+;;; midivelocity (default unit: midivelocity)
+;;;
+;;; Return Value
+;;; event
+;;;
+;;; Last Modified
+;;; 2021/04/20
+;;;
+;;; Synopsis
+(defun make-note (&optional start-time
+		    duration midinote
+		    (midivelocity 80))
+;;; ****
+  (make-event :start-time (when start-time (secs start-time))
+	      :duration (when duration (secs duration))
+	      :pitch (when midinote (midinote midinote))
+	      :amplitude (when midivelocity (midivelocity midivelocity))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ****f* event/make-event-tree
 ;;; Name
 ;;; make-event-tree

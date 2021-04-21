@@ -157,9 +157,9 @@
 	   `(defun make-event ,(append
 				'(&key)
 				(loop for slot
-				   in event-slots
-				   collect
-				   (first slot))
+					in event-slots
+				      collect
+				      (first slot))
 				'(&allow-other-keys))
 	      (labels (;; checks if the specified value
 		       ;; matches the types listed in
@@ -169,8 +169,8 @@
 		       (ok? (val slot-name)
 			 (when val
 			   (let ((the-val
-				  (cc-prepare-value-for-event-slot
-				   val slot-name)))
+				   (cc-prepare-value-for-event-slot
+				    val slot-name)))
 			     (if the-val
 				 the-val
 				 (cc-error 'MAKE-EVENT
@@ -221,7 +221,8 @@
       (format stream ": ~a" (name event)))))
 
 (defmethod print-object ((obj event) stream)
-  (loop for slot in (get-slots obj)
+  (loop for slot in (reverse (get-slots obj))
+	;; reversed order->basic stuff first (name, space and time...)
      do
        (let* ((val (funcall slot obj)))
 	 ;; do not always print all events recursively

@@ -43,6 +43,94 @@
 ;;; channel (Cannel 1) of the output-file. Amplitude values will be used when
 ;;; given, else midivelocity will default to 80.
 ;;;
+;;; Output Format
+;;; :midi
+;;;
+;;; Required Slots
+;;; duration, start-time, pitch
+;;;
+;;; Optional Slots
+;;; amplitude
+;;;
+;;; Last Modified
+;;; 2021/01/31
+;;;
+;;; Synopsis
+(make-render-mode midi-mode :midi
+		  :required-slots
+		  (start-time duration pitch)
+		  :options
+		  ((division 480))
+		  :optional-slots
+		  (amplitude)
+;;; ****
+		  :event-code
+		  (progn
+		    (push
+		     (make-instance 'midi:note-off-message
+		    		    :status 128
+		    		    :velocity 0
+		    		    :key (round (value pitch 'midinote))
+		    		    :time (1- (round
+					       (midi::get-midi-time
+						(+
+						 (value duration 'secs)
+						 (value start-time 'secs))
+						division))))
+		     tmp1)
+		    (push
+		     (make-instance 'midi:note-on-message
+				    :status 144
+				    :velocity (round
+					       (if amplitude
+						   (value amplitude
+							  'midivelocity)
+						   80))
+				    :key (round (value pitch 'midinote))
+				    :time (round
+					   (midi::get-midi-time
+					    (value start-time 'secs)
+					    division)))
+		     tmp1))
+		  :footer-code
+		  (let ((outfile
+			  (make-tmp-file nil "mid" "midi-mode")))
+		    ;;write the midi file:
+		    (midi:write-midi-file
+		     (make-instance 'midi:midifile
+				    :division 480
+				    :format 0
+				    :tracks
+				    (list
+				     (append
+				      (list
+				       (make-instance
+					'midi::tempo-message
+					:status 255
+					:time 0
+					:tempo 500000))
+				      (sort tmp1
+					    #'< :key
+					    #'midi:message-time))))
+		     outfile)
+		    ;; success?
+		    (when (probe-file outfile)
+		      (setq return-file-path outfile))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ****R* render-mode/midi-notation-mode
+;;; Name
+;;; midi-notation-mode
+;;;
+;;; File
+;;; rm-midi-mode.lsp
+;;;
+;;; Description
+;;; A render-mode for notateable midi output.
+;;; Pitch, start-time and duration will be used to create midinotes on a single
+;;; channel (Cannel 1) of the output-file. Amplitude values will be used when
+;;; given, else midivelocity will default to 80.
+;;;
 ;;; The midi timing is not optimal yet! There are deviations in
 ;;; output-times, especially when writing long files.
 ;;; When Syncronisation with other modes is important, it is
@@ -62,7 +150,7 @@
 ;;; 2021/01/31
 ;;;
 ;;; Synopsis
-(make-render-mode midi-mode :midi
+(make-render-mode midi-notation-mode :midi
 		  :required-slots
 		  (start-time duration pitch)
 		  :options
@@ -296,3 +384,4 @@
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EOF
+
